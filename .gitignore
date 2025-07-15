@@ -31,3 +31,33 @@ coverage
 
 test-results/
 playwright-report/
+
+# Debug files
+debug-*.png
+debug-*.txt
+debug-*.json
+debug-*.spec.ts
+*-debug.*
+
+# Temporary files
+*.tmp
+*.temp
+temp-*
+tmp-*
+
+# IDE and editor files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
