@@ -1,0 +1,7 @@
+Step 2: Incrementally Add Needed Libraries, Configs, and Structure
+
+- Add/update package.json as needed.
+- Add/update Tailwind, Vue, and Vue Router via CDN in index.html.
+- Add configuration files (e.g., .eslintrc, .gitignore).
+- Set up public/js/ folder structure.
+- Verify app runs after each change.

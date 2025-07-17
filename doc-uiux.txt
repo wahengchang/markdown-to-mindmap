@@ -1,0 +1,147 @@
+UI/UX Guidelines for Markdown → MindMap
+
+1. Overview
+
+These guidelines describe the interface and user experience for the web‑only “Markdown → MindMap” app, based on the reference UI (two‑pane editor + mind‑map preview). They ensure consistent layout, controls, and flows for designers, developers, and QA.
+
+2. Screen Layout
+
++--------------------------------------------------------------+
+| Top Nav: [Home] [Try It Out] [Docs]           [Theme Toggle]|
++--------------------------------------------------------------+
+| Sub‑Toolbar: [Open URL] [Solid Color] [Wrap Text]            |
+|             [Embed Assets?] [Limit Level] [Filter]           |
+|             [Center Node] [Learn More]                       |
++----------------------+---------------------------------------+
+| Markdown Editor (left) | MindMap Canvas (right)               |
+|                      | [+][-][Drag][Fullscreen]              |
++----------------------+---------------------------------------+
+| Status Bar: versions, [Download HTML] [Download SVG]        |
++--------------------------------------------------------------+
+
+2.1 Top Navigation
+
+Home / Try It Out / Docs: Primary app sections; “Try It Out” is active by default.
+
+Theme Toggle (sun/moon icon): Switch between light/dark modes.
+
+2.2 Sub‑Toolbar
+
+Open URL: Load remote Markdown via URL.
+
+Use Solid Color: Toggle node color scheme between gradient & solid.
+
+Wrap Long Text: Enable word‑wrapping on node labels.
+
+Embed Assets?: Inline external images/assets into export.
+
+Limit Expand Level: Restrict tree depth on initial render.
+
+Filter Nodes: Live‑filter by keyword.
+
+Center Active Node: Focus currently selected node.
+
+Learn More: Link to documentation.
+
+2.3 Main Panes
+
+Editor Pane (left, editable): Monospaced Markdown editor with line numbers, syntax highlighting, frontmatter support.
+
+Canvas Pane (right, interactive): SVG/D3 mind‑map, panning & zooming via mouse or touch.
+
+2.4 Canvas Controls
+
++ / –: Zoom in/out.
+
+Drag Handle: Click‑and‑drag to pan canvas.
+
+Fullscreen: Toggle canvas to full viewport.
+
+2.5 Status Bar & Download
+
+Displays versions: markmap‑lib@..., markmap‑view@..., markmap‑render@....
+
+Download as Interactive HTML: Exports single HTML with live mind‑map.
+
+Download as SVG: Exports static SVG snapshot.
+
+3. Interaction Patterns
+
+Edit & Preview Sync
+
+Markdown updates reflect on mind‑map in <100 ms.
+
+Edit pane and canvas scroll/zoom states are independent.
+
+Toolbar Actions
+
+Clicking an option toggles state immediately.
+
+Active toggles have a visible highlight.
+
+Disabled actions (e.g. when no nodes) are greyed out.
+
+Node Interaction
+
+Collapse/Expand: Click node circle or press Space when focused.
+
+Select Node: Click text or use arrow keys in canvas.
+
+Center Node: Auto‑center on select if sidebar filter active.
+
+Search & Filter
+
+Typing in filter input hides non‑matching nodes in real‑time.
+
+Match highlights in contrasting color.
+
+Export
+
+Export buttons open a progress indicator.
+
+Success toast appears on completion.
+
+4. Responsive Behavior
+
+Breakpoint
+
+Layout
+
+≥1200px
+
+Two‑pane side by side + sub‑toolbar visible
+
+800–1199px
+
+Two‑pane stacked with resizable splitter
+
+<800px
+
+Toggle between editor/canvas via top tabs
+
+Touch targets ≥40×40px
+
+All buttons and toggles accessible via keyboard & screen reader
+
+5. Accessibility
+
+Keyboard Navigation: Tab to all controls; arrow keys in canvas; Space/Enter to activate.
+
+ARIA Labels: Provide descriptive aria-label on toolbar buttons and canvas regions.
+
+Contrast: Ensure text/icon color ratios ≥4.5:1.
+
+Live Regions: Announce render status and filter results via aria-live="polite".
+
+6. User Flows & States
+
+Load App: Show placeholder mind‑map + editor sample; prompt “Paste your Markdown”.
+
+Invalid Markdown: Show inline error banner in editor; canvas remains unchanged.
+
+Apply Filter: Dim non‑matches; show count of matches.
+
+Change Theme: Animate background & node color transitions.
+
+Offline: Service worker snackbar: “You are offline; using cached version.”
+

@@ -1,0 +1,5 @@
+Step 1: Remove Unused Pages and Components
+
+- Remove all unused pages and components, leaving only the Home page.
+- Confirm the app still loads and functions after cleanup.
+- Document files removed/cleared and any issues resolved.

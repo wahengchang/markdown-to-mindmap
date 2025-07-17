@@ -1,0 +1,7 @@
+Step 3: Implement Core Functionality
+
+- Implement Markdown parsing logic.
+- Implement mind map data structures.
+- Wire up Home page for Markdown input and mind map rendering.
+- Separate business logic from UI code.
+- Test after each unit of work.

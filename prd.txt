@@ -1,0 +1,115 @@
+1. Purpose
+Enable users to instantly transform Markdown outlines into interactive mind maps, all within a single‑page web app—no installation, no CLI.
+
+2. Scope
+In Scope: Web REPL at markmap.js.org; client‑only JavaScript.
+
+Out of Scope: CLI tools, IDE plugins, server‑side rendering.
+
+3. Stakeholders
+Product: Defines goals & prioritization
+
+Design: UI/UX, accessibility
+
+Engineering: Frontend framework, performance
+
+QA: Cross‑browser, accessibility testing
+
+Marketing: User acquisition, docs
+
+4. Objectives & Success Metrics
+Live Preview: ≤ 200 ms render for 500 nodes
+
+Adoption: 1,000 DAU within first quarter
+
+Performance: First meaningful paint < 1 s
+
+Accessibility: WCAG 2.1 AA compliance
+
+5. User Personas
+Claire, Technical Writer
+
+Needs quick visualization of document structure.
+
+Devon, Educator
+
+Embeds mind maps in lecture notes.
+
+Morgan, Knowledge Manager
+
+Shares interactive maps in knowledge base.
+
+6. Use Cases
+ID	User Story
+UC1	As Claire, I paste Markdown and immediately see the mind map.
+UC2	As Devon, I control fold states via inline magic comments.
+UC3	As Morgan, I customize colors/spacing in frontmatter once and share a link.
+UC4	As Claire, I export the map as PNG to include in a slide deck.
+
+7. Functional Requirements
+FR1: Parse Markdown (headings, lists, code, math) 
+markmap.js.org
+
+FR2: Render interactive SVG with expand/collapse, zoom, pan 
+markmap.js.org
+
+FR3: Read JSON options from frontmatter (markmap key) for theming, spacing, animation 
+markmap.js.org
+
+FR4: Recognize magic comments (fold, foldAll) for initial node state 
+markmap.js.org
+
+FR5: Export current view to PNG and SVG files
+
+8. Non‑Functional Requirements
+NFR1: Bundle size ≤ 150 KB (gzipped)
+
+NFR2: Render time ≤ 200 ms for 500 nodes on a mid‑range laptop
+
+NFR3: Works offline via service‑worker caching
+
+NFR4: Keyboard‑navigable; ARIA labels on all controls
+
+9. UI/UX Requirements
+Split view: Markdown editor on the left, mind map on the right
+
+Collapsible settings panel for JSON options
+
+Top toolbar with buttons:
+
+Export (PNG, SVG)
+
+Reset View
+
+Copy Embed Code
+
+Syntax highlighting in editor (Monaco or CodeMirror)
+
+Dark/light mode toggle
+
+10. Analytics & Monitoring
+Opt‑in performance telemetry: render times, node counts
+
+Error logging (client‑side) with user consent
+
+11. Security & Privacy
+Sanitize any HTML embedded in Markdown
+
+No data leaves the client by default
+
+User prompt for telemetry opt‑in
+
+12. Accessibility & Internationalization
+Full RTL language support
+
+ARIA labels and roles on nodes and buttons
+
+UI copy stored in a JSON file for easy localization
+
+13. Success Criteria
+Achieve ≤ 200 ms render time at 95th percentile
+
+80% of new users activate at least one export within first session
+
+WCAG 2.1 AA score ≥ 90 from automated audit
+
