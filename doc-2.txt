@@ -1,7 +1,77 @@
-Step 2: Incrementally Add Needed Libraries, Configs, and Structure
+Step 2: Basic Layout and Mindmap Implementation
 
-- Add/update package.json as needed.
-- Add/update Tailwind, Vue, and Vue Router via CDN in index.html.
-- Add configuration files (e.g., .eslintrc, .gitignore).
-- Set up public/js/ folder structure.
-- Verify app runs after each change.
+## Objectives
+- Set up the basic two-pane layout (similar to upload image)
+- Implement mindmap tree visualization with mock data
+- Verify mindmap rendering works correctly
+- No interactivity required at this stage
+
+## Basic Layout Implementation
+
+1. HTML Structure
+   - Create main container with two-pane layout
+   - Left pane: Markdown editor area
+   - Right pane: Mindmap visualization area
+   - Add simple header/navigation bar
+   - Add footer with basic info
+
+2. CSS Implementation
+   - Use Tailwind utility classes for layout
+   - Set appropriate dimensions for editor and visualization panes
+   - Implement responsive design for different screen sizes
+
+## Mock Data Setup
+
+1. Create Static Mock Data
+   - Define sample markdown content for testing
+   - Include various heading levels, lists, and formatting
+   - Store sample data directly in HTML file
+
+2. Markdown Structure Examples
+   ```markdown
+   # Main Topic
+   ## Subtopic 1
+   ### Detail A
+   ### Detail B
+   ## Subtopic 2
+   ### Detail C
+   #### Sub-detail
+   ### Detail D
+   ```
+
+## Mindmap Tree Implementation
+
+1. Basic Tree Structure
+   - Define data structure for nodes and connections
+   - Create tree building algorithm from parsed markdown
+   - Handle basic hierarchical relationships
+
+2. SVG Rendering
+   - Create SVG container in right pane
+   - Implement basic node rendering (circles/rectangles with text)
+   - Add connecting lines between parent-child nodes
+   - Apply default styling for nodes and connections
+
+3. Layout Algorithm
+   - Implement simple tree layout algorithm
+   - Position nodes based on hierarchy level
+   - Ensure no node overlap
+   - Calculate appropriate spacing between branches
+
+## Testing and Verification
+
+1. Visual Testing
+   - Verify mindmap renders correctly with mock data
+   - Ensure all markdown hierarchy levels appear in tree
+   - Check that tree layout is visually clear and readable
+   - Verify text content displays properly in nodes
+
+2. Structure Testing
+   - Confirm tree structure matches markdown hierarchy
+   - Verify parent-child relationships are correctly established
+   - Test with different markdown structures
+
+## Next Steps (for future phases)
+- Implement real-time markdown parsing (Step 3)
+- Add interactive features like zoom, pan, expand/collapse (Step 4)
+- Integrate with user input instead of mock data

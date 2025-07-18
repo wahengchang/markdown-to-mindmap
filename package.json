@@ -1,17 +1,22 @@
 {
-  "name": "express-server",
+  "name": "markdown-mindmap",
   "version": "1.0.0",
-  "description": "Express server with public HTML folder",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "playwright test e2e/"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx serve --no-clipboard -l 5000 ./public",
+    "start": "npx serve --no-clipboard -l 5000 ./public"
   },
-  "dependencies": {
-    "express": "^4.18.2"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wahengchang/markdown-to-mindmap.git"
   },
-  "devDependencies": {
-    "@playwright/test": "^1.54.1",
-    "playwright": "^1.54.1"
-  }
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wahengchang/markdown-to-mindmap/issues"
+  },
+  "homepage": "https://github.com/wahengchang/markdown-to-mindmap#readme",
+  "description": ""
 }

@@ -1,19 +1,258 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdown Mindmap</title>
-    <!-- Tailwind CSS -->
+    <title>Markdown to Mindmap</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue.js -->
-    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
-    <!-- Vue Router -->
-    <script src="https://cdn.jsdelivr.net/npm/vue-router@4/dist/vue-router.global.js"></script>
-    <!-- Main app -->
-    <script type="module" src="js/main.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
 </head>
-<body>
-    <div id="app"></div>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-full mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Markdown to Mindmap</h1>
+                <div class="flex items-center space-x-4">
+                    <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex h-screen pt-16">
+        <!-- Left Pane - Markdown Editor -->
+        <div class="w-1/2 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-medium text-gray-900 dark:text-white">Markdown Editor</h2>
+            </div>
+            <div class="flex-1 p-4">
+                <textarea 
+                    id="markdownInput" 
+                    class="w-full h-full resize-none border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter your markdown here..."
+                ></textarea>
+            </div>
+        </div>
+
+        <!-- Right Pane - Mindmap Visualization -->
+        <div class="w-1/2 bg-gray-50 dark:bg-gray-900 flex flex-col">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-medium text-gray-900 dark:text-white">Mind Map</h2>
+            </div>
+            <div class="flex-1 p-4">
+                <div id="mindmapContainer" class="w-full h-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 overflow-hidden">
+                    <svg id="mindmapSVG" class="w-full h-full" viewBox="0 0 800 600">
+                        <!-- Mindmap will be rendered here -->
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-3">
+        <div class="max-w-full mx-auto px-4 text-center text-sm text-gray-600 dark:text-gray-400">
+            Markdown to Mindmap - Transform your markdown into interactive mind maps
+        </div>
+    </footer>
+
+    <script>
+        // Mock data for testing
+        const mockMarkdown = `# Main Topic
+## Subtopic 1
+### Detail A
+### Detail B
+## Subtopic 2
+### Detail C
+#### Sub-detail
+### Detail D`;
+
+        // Tree data structure
+        class TreeNode {
+            constructor(text, level = 0) {
+                this.text = text;
+                this.level = level;
+                this.children = [];
+                this.parent = null;
+                this.x = 0;
+                this.y = 0;
+            }
+
+            addChild(node) {
+                node.parent = this;
+                this.children.push(node);
+            }
+        }
+
+        // Parse markdown into tree structure
+        function parseMarkdownToTree(markdown) {
+            const lines = markdown.split('\n').filter(line => line.trim());
+            const root = new TreeNode('Root', 0);
+            const stack = [root];
+
+            lines.forEach(line => {
+                const match = line.match(/^(#+)\s+(.+)$/);
+                if (match) {
+                    const level = match[1].length;
+                    const text = match[2];
+                    const node = new TreeNode(text, level);
+
+                    // Find correct parent
+                    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
+                        stack.pop();
+                    }
+
+                    stack[stack.length - 1].addChild(node);
+                    stack.push(node);
+                }
+            });
+
+            return root;
+        }
+
+        // Calculate tree layout
+        function calculateLayout(root, startX = 400, startY = 50) {
+            const nodeWidth = 120;
+            const nodeHeight = 40;
+            const levelHeight = 80;
+            const siblingSpacing = 20;
+
+            function calculateSubtreeWidth(node) {
+                if (node.children.length === 0) return nodeWidth;
+                
+                let totalWidth = 0;
+                node.children.forEach(child => {
+                    totalWidth += calculateSubtreeWidth(child);
+                });
+                totalWidth += (node.children.length - 1) * siblingSpacing;
+                return Math.max(totalWidth, nodeWidth);
+            }
+
+            function positionNodes(node, x, y) {
+                node.x = x;
+                node.y = y;
+
+                if (node.children.length === 0) return;
+
+                const subtreeWidth = calculateSubtreeWidth(node);
+                let currentX = x - subtreeWidth / 2;
+
+                node.children.forEach(child => {
+                    const childSubtreeWidth = calculateSubtreeWidth(child);
+                    positionNodes(child, currentX + childSubtreeWidth / 2, y + levelHeight);
+                    currentX += childSubtreeWidth + siblingSpacing;
+                });
+            }
+
+            positionNodes(root, startX, startY);
+        }
+
+        // Render mindmap SVG
+        function renderMindmap(root) {
+            const svg = document.getElementById('mindmapSVG');
+            svg.innerHTML = '';
+
+            function renderNode(node) {
+                if (node.text === 'Root') {
+                    node.children.forEach(child => renderNode(child));
+                    return;
+                }
+
+                // Create node group
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                
+                // Node rectangle
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', node.x - 60);
+                rect.setAttribute('y', node.y - 20);
+                rect.setAttribute('width', 120);
+                rect.setAttribute('height', 40);
+                rect.setAttribute('rx', 8);
+                rect.setAttribute('fill', getNodeColor(node.level));
+                rect.setAttribute('stroke', '#374151');
+                rect.setAttribute('stroke-width', '2');
+                
+                // Node text
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x);
+                text.setAttribute('y', node.y + 5);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-family', 'system-ui, sans-serif');
+                text.setAttribute('font-size', '12');
+                text.setAttribute('fill', '#1f2937');
+                text.textContent = node.text.length > 15 ? node.text.substring(0, 15) + '...' : node.text;
+
+                group.appendChild(rect);
+                group.appendChild(text);
+                svg.appendChild(group);
+
+                // Draw connections to children
+                node.children.forEach(child => {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', node.x);
+                    line.setAttribute('y1', node.y + 20);
+                    line.setAttribute('x2', child.x);
+                    line.setAttribute('y2', child.y - 20);
+                    line.setAttribute('stroke', '#6b7280');
+                    line.setAttribute('stroke-width', '2');
+                    svg.appendChild(line);
+                    
+                    renderNode(child);
+                });
+            }
+
+            renderNode(root);
+        }
+
+        // Get node color based on level
+        function getNodeColor(level) {
+            const colors = ['#dbeafe', '#fef3c7', '#d1fae5', '#fce7f3', '#e0e7ff'];
+            return colors[level % colors.length];
+        }
+
+        // Dark mode toggle
+        function initializeDarkMode() {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            }
+
+            darkModeToggle.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+            });
+        }
+
+        // Initialize application
+        function init() {
+            initializeDarkMode();
+            
+            // Load mock data
+            document.getElementById('markdownInput').value = mockMarkdown;
+            
+            // Parse and render mindmap
+            const tree = parseMarkdownToTree(mockMarkdown);
+            calculateLayout(tree);
+            renderMindmap(tree);
+        }
+
+        // Start the application
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>
