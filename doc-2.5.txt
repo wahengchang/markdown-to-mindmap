@@ -1,0 +1,38 @@
+doc-2.5: Migration Plan to d3-mindmap
+
+
+
+1. Analyze Current Mindmap Rendering
+   - Identify all code responsible for rendering the mindmap (HTML, JS, and data structure).
+   - Note how the current mindmap data is structured and passed to the renderer.
+
+2. Study d3-mindmap Integration
+   - d3-mindmap expects a JSON tree structure with `name` and `children` fields.
+   - Rendering is performed by including the following script tags in your HTML:
+     
+     <!-- d3.js -->
+     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+     <!-- d3-mindmap -->
+     <script src="https://cdn.jsdelivr.net/npm/d3-mindmap/dist/d3-mindmap.min.js"></script>
+     
+   - Then call:
+     getRender(targetElement)(data);
+   - The live demo shows interactive, zoomable mindmaps rendered in SVG.
+
+3. Plan the Migration Steps
+
+   a. Prepare Data
+      - Adapt your mindmap data to match d3-mindmap’s expected format (`{ name, children }`).
+
+   b. Update Dependencies
+      - Use CDN method to include d3 and d3-mindmap. Do NOT install any npm libraries or use import statements. This project is 100% CDN-based.
+
+   c. Refactor Rendering Code
+      - Remove or disable the current mindmap rendering logic.
+      - Use `getRender` from the included d3-mindmap script.
+      - Select the appropriate DOM container for rendering (e.g., a div or svg in your HTML).
+
+   e. Polish and Document
+      - Clean up unused code.
+      - Add comments and documentation for the new integration.
+      - Optionally, expose configuration options for customizing the mindmap appearance.

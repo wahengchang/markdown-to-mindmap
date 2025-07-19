@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown to Mindmap</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- d3.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -17,15 +19,74 @@
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <!-- Top Navigation -->
         <div class="max-w-full mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
-                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Markdown to Mindmap</h1>
+                <div class="flex items-center space-x-6">
+                    <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Markdown to Mindmap</h1>
+                    <nav class="flex space-x-4">
+                        <button class="nav-tab active px-3 py-1 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">Try It Out</button>
+                        <button class="nav-tab px-3 py-1 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">Docs</button>
+                        <button class="nav-tab px-3 py-1 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">About</button>
+                    </nav>
+                </div>
                 <div class="flex items-center space-x-4">
-                    <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" aria-label="Toggle dark mode">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                         </svg>
                     </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sub-Toolbar -->
+        <div class="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+            <div class="max-w-full mx-auto px-4 py-2">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <button id="openUrlBtn" class="toolbar-btn flex items-center px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" aria-label="Open URL">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                            </svg>
+                            <span class="ml-1">Open URL</span>
+                        </button>
+                        
+                        <button id="solidColorBtn" class="toolbar-btn flex items-center px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" aria-label="Use solid colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM7 21h10a2 2 0 002-2v-4a2 2 0 00-2-2H7"></path>
+                            </svg>
+                            <span class="ml-1">Solid Color</span>
+                        </button>
+                        
+                        <button id="wrapTextBtn" class="toolbar-btn flex items-center px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" aria-label="Wrap long text">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
+                            </svg>
+                            <span class="ml-1">Wrap Text</span>
+                        </button>
+                        
+                        <button id="centerNodeBtn" class="toolbar-btn flex items-center px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" aria-label="Center active node">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                            <span class="ml-1">Center Node</span>
+                        </button>
+                        
+                        <div class="flex items-center space-x-2">
+                            <label class="text-xs text-gray-600 dark:text-gray-400">Filter:</label>
+                            <input id="filterInput" type="text" placeholder="Filter nodes..." class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 w-32">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3">
+                        <button id="learnMoreBtn" class="toolbar-btn flex items-center px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors" aria-label="Learn more">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="ml-1">Learn More</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -49,38 +110,182 @@
 
         <!-- Right Pane - Mindmap Visualization -->
         <div class="w-1/2 bg-gray-50 dark:bg-gray-900 flex flex-col">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-white">Mind Map</h2>
+                <div class="flex items-center space-x-2">
+                    <button id="zoomInBtn" class="canvas-control-btn p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Zoom in">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                    </button>
+                    <button id="zoomOutBtn" class="canvas-control-btn p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Zoom out">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6"></path>
+                        </svg>
+                    </button>
+                    <button id="resetZoomBtn" class="canvas-control-btn p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Reset zoom">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                    </button>
+                    <button id="fullscreenBtn" class="canvas-control-btn p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700" aria-label="Toggle fullscreen">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="flex-1 p-4">
-                <div id="mindmapContainer" class="w-full h-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 overflow-hidden">
-                    <svg id="mindmapSVG" class="w-full h-full" viewBox="0 0 800 600">
-                        <!-- Mindmap will be rendered here -->
-                    </svg>
+            <div class="flex-1 p-4 relative">
+                <div id="mindmapContainer" class="w-full h-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 overflow-hidden relative">
+                    <!-- D3 mindmap will be rendered here -->
+                </div>
+                    
+                    <!-- Canvas Overlay Controls -->
+                    <div class="absolute top-4 right-4 flex flex-col space-y-2">
+                        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+                            <div class="text-xs text-gray-600 dark:text-gray-400 mb-1">Zoom</div>
+                            <div id="zoomLevel" class="text-sm font-medium text-gray-900 dark:text-white">100%</div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+                            <div class="text-xs text-gray-600 dark:text-gray-400 mb-1">Nodes</div>
+                            <div id="nodeCount" class="text-sm font-medium text-gray-900 dark:text-white">0</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Indicator -->
+                    <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-800 bg-opacity-75 hidden">
+                        <div class="flex items-center space-x-2">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Rendering...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Footer -->
+    <!-- Status Bar -->
     <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-3">
-        <div class="max-w-full mx-auto px-4 text-center text-sm text-gray-600 dark:text-gray-400">
-            Markdown to Mindmap - Transform your markdown into interactive mind maps
+        <div class="max-w-full mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4 text-xs text-gray-600 dark:text-gray-400">
+                    <span id="appVersion">markdown-mindmap v1.0.0</span>
+                    <span id="renderTime">Render: 0ms</span>
+                    <span id="statusMessage">Ready</span>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button id="downloadHtmlBtn" class="download-btn flex items-center px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors" aria-label="Download as HTML">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Download HTML
+                    </button>
+                    
+                    <button id="downloadSvgBtn" class="download-btn flex items-center px-3 py-1 text-xs text-white bg-green-600 hover:bg-green-700 rounded transition-colors" aria-label="Download as SVG">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                        </svg>
+                        Download SVG
+                    </button>
+                </div>
+            </div>
         </div>
     </footer>
+    
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
     <script>
+        // ======================
+        // BUSINESS LOGIC MODULE
+        // ======================
+        
         // Mock data for testing
-        const mockMarkdown = `# Main Topic
-## Subtopic 1
-### Detail A
-### Detail B
-## Subtopic 2
-### Detail C
-#### Sub-detail
-### Detail D`;
+        const mockMarkdown = `# Web Development Roadmap
 
-        // Tree data structure
+## Frontend Development
+### HTML & CSS
+#### HTML5 Semantic Elements
+#### CSS3 Flexbox & Grid
+#### Responsive Design
+#### CSS Preprocessors
+##### Sass
+##### Less
+##### Stylus
+
+### JavaScript
+#### ES6+ Features
+##### Arrow Functions
+##### Promises & Async/Await
+##### Modules
+##### Destructuring
+#### Frontend Frameworks
+##### React
+###### React Hooks
+###### React Router
+###### State Management
+##### Vue.js
+###### Vue 3 Composition API
+###### Vuex
+##### Angular
+###### TypeScript
+###### RxJS
+
+## Backend Development
+### Node.js
+#### Express.js
+#### RESTful APIs
+#### GraphQL
+#### Authentication
+##### JWT
+##### OAuth
+##### Session Management
+
+### Databases
+#### SQL Databases
+##### PostgreSQL
+##### MySQL
+##### SQLite
+#### NoSQL Databases
+##### MongoDB
+##### Redis
+##### Elasticsearch
+
+## DevOps & Tools
+### Version Control
+#### Git
+##### Branching Strategies
+##### Pull Requests
+##### Git Flow
+
+### CI/CD
+#### GitHub Actions
+#### Jenkins
+#### Docker
+##### Containerization
+##### Docker Compose
+
+### Cloud Platforms
+#### AWS
+##### EC2
+##### S3
+##### RDS
+#### Google Cloud
+#### Azure
+
+## Testing
+### Unit Testing
+#### Jest
+#### Mocha
+#### Chai
+### Integration Testing
+### End-to-End Testing
+#### Cypress
+#### Playwright
+#### Selenium`;
+
+        // Enhanced Tree data structure
         class TreeNode {
             constructor(text, level = 0) {
                 this.text = text;
@@ -89,26 +294,162 @@
                 this.parent = null;
                 this.x = 0;
                 this.y = 0;
+                this.type = 'text'; // Default type
+                this.id = TreeNode.generateId();
+                this.collapsed = false;
+                this.metadata = {};
+            }
+
+            static generateId() {
+                return 'node_' + Math.random().toString(36).substr(2, 9);
             }
 
             addChild(node) {
                 node.parent = this;
                 this.children.push(node);
             }
+
+            removeChild(node) {
+                const index = this.children.indexOf(node);
+                if (index > -1) {
+                    this.children.splice(index, 1);
+                    node.parent = null;
+                }
+            }
+
+            // Find all nodes of a specific type
+            findByType(type) {
+                let results = [];
+                if (this.type === type) {
+                    results.push(this);
+                }
+                for (let child of this.children) {
+                    results = results.concat(child.findByType(type));
+                }
+                return results;
+            }
+
+            // Get all descendant nodes
+            getAllDescendants() {
+                let descendants = [];
+                for (let child of this.children) {
+                    descendants.push(child);
+                    descendants = descendants.concat(child.getAllDescendants());
+                }
+                return descendants;
+            }
+
+            // Get path from root to this node
+            getPath() {
+                let path = [];
+                let current = this;
+                while (current && current.parent) {
+                    path.unshift(current);
+                    current = current.parent;
+                }
+                return path;
+            }
+
+            // Toggle collapse state
+            toggleCollapse() {
+                this.collapsed = !this.collapsed;
+            }
+
+            // Get visible children (not collapsed)
+            getVisibleChildren() {
+                return this.collapsed ? [] : this.children;
+            }
+
+            // Get total node count in subtree
+            getNodeCount() {
+                let count = 1; // Count this node
+                for (let child of this.children) {
+                    count += child.getNodeCount();
+                }
+                return count;
+            }
+
+            // Serialize node to JSON
+            toJSON() {
+                return {
+                    id: this.id,
+                    text: this.text,
+                    level: this.level,
+                    type: this.type,
+                    collapsed: this.collapsed,
+                    metadata: this.metadata,
+                    children: this.children.map(child => child.toJSON())
+                };
+            }
+
+            // Create node from JSON
+            static fromJSON(json) {
+                const node = new TreeNode(json.text, json.level);
+                node.id = json.id;
+                node.type = json.type || 'text';
+                node.collapsed = json.collapsed || false;
+                node.metadata = json.metadata || {};
+                
+                if (json.children) {
+                    for (let childData of json.children) {
+                        const child = TreeNode.fromJSON(childData);
+                        node.addChild(child);
+                    }
+                }
+                
+                return node;
+            }
         }
 
-        // Parse markdown into tree structure
+        // Enhanced Markdown parsing with support for complex features
         function parseMarkdownToTree(markdown) {
-            const lines = markdown.split('\n').filter(line => line.trim());
+            const lines = markdown.split('\n');
             const root = new TreeNode('Root', 0);
             const stack = [root];
+            let inCodeBlock = false;
+            let codeBlockContent = '';
+            let codeBlockLanguage = '';
 
-            lines.forEach(line => {
-                const match = line.match(/^(#+)\s+(.+)$/);
-                if (match) {
-                    const level = match[1].length;
-                    const text = match[2];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const trimmedLine = line.trim();
+
+                // Skip empty lines
+                if (!trimmedLine) continue;
+
+                // Handle code blocks
+                if (trimmedLine.startsWith('```')) {
+                    if (!inCodeBlock) {
+                        // Start of code block
+                        inCodeBlock = true;
+                        codeBlockLanguage = trimmedLine.substring(3).trim();
+                        codeBlockContent = '';
+                    } else {
+                        // End of code block
+                        inCodeBlock = false;
+                        const codeNode = new TreeNode(`Code: ${codeBlockLanguage}`, stack[stack.length - 1].level + 1);
+                        codeNode.type = 'code';
+                        codeNode.language = codeBlockLanguage;
+                        codeNode.content = codeBlockContent;
+                        stack[stack.length - 1].addChild(codeNode);
+                        codeBlockContent = '';
+                    }
+                    continue;
+                }
+
+                // If inside code block, accumulate content
+                if (inCodeBlock) {
+                    codeBlockContent += line + '\n';
+                    continue;
+                }
+
+                // Handle headers
+                const headerMatch = line.match(/^(#+)\s+(.+)$/);
+                if (headerMatch) {
+                    const level = headerMatch[1].length;
+                    const text = headerMatch[2];
                     const node = new TreeNode(text, level);
+                    node.type = 'header';
 
                     // Find correct parent
                     while (stack.length > 1 && stack[stack.length - 1].level >= level) {
@@ -117,104 +458,305 @@
 
                     stack[stack.length - 1].addChild(node);
                     stack.push(node);
+                    continue;
                 }
-            });
+
+                // Handle unordered lists
+                const unorderedListMatch = line.match(/^(\s*)[-*+]\s+(.+)$/);
+                if (unorderedListMatch) {
+                    const indent = unorderedListMatch[1].length;
+                    const text = unorderedListMatch[2];
+                    const listLevel = Math.floor(indent / 2) + stack[stack.length - 1].level + 1;
+                    const node = new TreeNode(text, listLevel);
+                    node.type = 'list-item';
+                    node.listType = 'unordered';
+
+                    // Find correct parent based on indentation
+                    while (stack.length > 1 && stack[stack.length - 1].level >= listLevel) {
+                        stack.pop();
+                    }
+
+                    stack[stack.length - 1].addChild(node);
+                    continue;
+                }
+
+                // Handle ordered lists
+                const orderedListMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+                if (orderedListMatch) {
+                    const indent = orderedListMatch[1].length;
+                    const text = orderedListMatch[2];
+                    const listLevel = Math.floor(indent / 2) + stack[stack.length - 1].level + 1;
+                    const node = new TreeNode(text, listLevel);
+                    node.type = 'list-item';
+                    node.listType = 'ordered';
+
+                    // Find correct parent based on indentation
+                    while (stack.length > 1 && stack[stack.length - 1].level >= listLevel) {
+                        stack.pop();
+                    }
+
+                    stack[stack.length - 1].addChild(node);
+                    continue;
+                }
+
+                // Handle checkboxes
+                const checkboxMatch = line.match(/^(\s*)[-*+]\s+\[([x\s])\]\s+(.+)$/);
+                if (checkboxMatch) {
+                    const indent = checkboxMatch[1].length;
+                    const isChecked = checkboxMatch[2].toLowerCase() === 'x';
+                    const text = checkboxMatch[3];
+                    const listLevel = Math.floor(indent / 2) + stack[stack.length - 1].level + 1;
+                    const node = new TreeNode(text, listLevel);
+                    node.type = 'checkbox';
+                    node.checked = isChecked;
+
+                    // Find correct parent based on indentation
+                    while (stack.length > 1 && stack[stack.length - 1].level >= listLevel) {
+                        stack.pop();
+                    }
+
+                    stack[stack.length - 1].addChild(node);
+                    continue;
+                }
+
+                // Handle table rows (simple detection)
+                if (line.includes('|') && !line.startsWith('|')) {
+                    const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
+                    if (cells.length > 1) {
+                        const tableNode = new TreeNode(`Table: ${cells[0]} | ${cells[1]}`, stack[stack.length - 1].level + 1);
+                        tableNode.type = 'table';
+                        tableNode.cells = cells;
+                        stack[stack.length - 1].addChild(tableNode);
+                        continue;
+                    }
+                }
+
+                // Handle math expressions (LaTeX)
+                if (line.includes('$') && !line.startsWith('$')) {
+                    const mathMatch = line.match(/\$(.*?)\$/);
+                    if (mathMatch) {
+                        const mathNode = new TreeNode(`Math: ${mathMatch[1]}`, stack[stack.length - 1].level + 1);
+                        mathNode.type = 'math';
+                        mathNode.formula = mathMatch[1];
+                        stack[stack.length - 1].addChild(mathNode);
+                        continue;
+                    }
+                }
+
+                // Handle regular text paragraphs
+                if (trimmedLine && !trimmedLine.startsWith('#')) {
+                    const textNode = new TreeNode(trimmedLine, stack[stack.length - 1].level + 1);
+                    textNode.type = 'text';
+                    stack[stack.length - 1].addChild(textNode);
+                }
+            }
 
             return root;
         }
 
-        // Calculate tree layout
-        function calculateLayout(root, startX = 400, startY = 50) {
-            const nodeWidth = 120;
-            const nodeHeight = 40;
-            const levelHeight = 80;
-            const siblingSpacing = 20;
-
-            function calculateSubtreeWidth(node) {
-                if (node.children.length === 0) return nodeWidth;
-                
-                let totalWidth = 0;
-                node.children.forEach(child => {
-                    totalWidth += calculateSubtreeWidth(child);
-                });
-                totalWidth += (node.children.length - 1) * siblingSpacing;
-                return Math.max(totalWidth, nodeWidth);
-            }
-
-            function positionNodes(node, x, y) {
-                node.x = x;
-                node.y = y;
-
-                if (node.children.length === 0) return;
-
-                const subtreeWidth = calculateSubtreeWidth(node);
-                let currentX = x - subtreeWidth / 2;
-
-                node.children.forEach(child => {
-                    const childSubtreeWidth = calculateSubtreeWidth(child);
-                    positionNodes(child, currentX + childSubtreeWidth / 2, y + levelHeight);
-                    currentX += childSubtreeWidth + siblingSpacing;
-                });
-            }
-
-            positionNodes(root, startX, startY);
+        // ======================
+        // D3 MINDMAP RENDERING MODULE
+        // ======================
+        
+        // Custom d3-based mindmap implementation
+        function createD3Mindmap(data, container) {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            // Clear container
+            d3.select(container).selectAll("*").remove();
+            
+            // Create SVG
+            const svg = d3.select(container)
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+            
+            const g = svg.append("g");
+            
+            // Create tree layout
+            const tree = d3.tree().size([width - 160, height - 160]);
+            
+            // Convert data to hierarchy
+            const root = d3.hierarchy(data);
+            tree(root);
+            
+            // Create links
+            g.selectAll(".link")
+                .data(root.links())
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("d", d3.linkHorizontal()
+                    .x(d => d.y + 80)
+                    .y(d => d.x + 80))
+                .style("fill", "none")
+                .style("stroke", "#ccc")
+                .style("stroke-width", 2);
+            
+            // Create nodes
+            const node = g.selectAll(".node")
+                .data(root.descendants())
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.y + 80},${d.x + 80})`);
+            
+            node.append("circle")
+                .attr("r", 6)
+                .style("fill", d => d.depth === 0 ? "#69b3a2" : "#404040")
+                .style("stroke", "#fff")
+                .style("stroke-width", 2);
+            
+            node.append("text")
+                .attr("dy", ".35em")
+                .attr("x", d => d.children ? -13 : 13)
+                .style("text-anchor", d => d.children ? "end" : "start")
+                .style("font-size", "12px")
+                .style("fill", "#333")
+                .text(d => d.data.name || d.data.text || "");
+            
+            return svg.node();
         }
 
-        // Render mindmap SVG
-        function renderMindmap(root) {
-            const svg = document.getElementById('mindmapSVG');
-            svg.innerHTML = '';
+        // ======================
+        // LAYOUT ENGINE MODULE
+        // ======================
+        
+        // Calculate radial layout optimized for treemap display
+        function calculateLayout(root, centerX = 600, centerY = 400) {
+            const baseRadius = 120;
+            const radiusIncrement = 90;
+            const minAngleSpacing = 0.6;
 
-            function renderNode(node) {
+            function positionRadially(node, angle = 0, radius = 0, parentX = centerX, parentY = centerY) {
                 if (node.text === 'Root') {
-                    node.children.forEach(child => renderNode(child));
+                    // Position root at center
+                    node.x = centerX;
+                    node.y = centerY;
+                    
+                    // Distribute children around the center with optimal spacing
+                    const childCount = node.children.length;
+                    const angleStep = (2 * Math.PI) / childCount;
+                    
+                    // Start from top and distribute evenly
+                    const startAngle = -Math.PI / 2; // Start at top
+                    
+                    node.children.forEach((child, index) => {
+                        const childAngle = startAngle + index * angleStep;
+                        positionRadially(child, childAngle, baseRadius, centerX, centerY);
+                    });
                     return;
                 }
 
-                // Create node group
-                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                
-                // Node rectangle
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', node.x - 60);
-                rect.setAttribute('y', node.y - 20);
-                rect.setAttribute('width', 120);
-                rect.setAttribute('height', 40);
-                rect.setAttribute('rx', 8);
-                rect.setAttribute('fill', getNodeColor(node.level));
-                rect.setAttribute('stroke', '#374151');
-                rect.setAttribute('stroke-width', '2');
-                
-                // Node text
-                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text.setAttribute('x', node.x);
-                text.setAttribute('y', node.y + 5);
-                text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('font-family', 'system-ui, sans-serif');
-                text.setAttribute('font-size', '12');
-                text.setAttribute('fill', '#1f2937');
-                text.textContent = node.text.length > 15 ? node.text.substring(0, 15) + '...' : node.text;
+                // Calculate position based on angle and radius
+                node.x = parentX + radius * Math.cos(angle);
+                node.y = parentY + radius * Math.sin(angle);
 
-                group.appendChild(rect);
-                group.appendChild(text);
-                svg.appendChild(group);
-
-                // Draw connections to children
-                node.children.forEach(child => {
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', node.x);
-                    line.setAttribute('y1', node.y + 20);
-                    line.setAttribute('x2', child.x);
-                    line.setAttribute('y2', child.y - 20);
-                    line.setAttribute('stroke', '#6b7280');
-                    line.setAttribute('stroke-width', '2');
-                    svg.appendChild(line);
+                // Position children with optimized spacing
+                if (node.children.length > 0) {
+                    const childRadius = radius + radiusIncrement;
                     
-                    renderNode(child);
-                });
+                    // Calculate angle span based on number of children and depth
+                    const baseAngleSpan = Math.PI / 3; // 60 degrees base
+                    const depthFactor = Math.max(0.5, 1 - (node.level * 0.1)); // Reduce span at deeper levels
+                    const angleSpan = Math.max(
+                        minAngleSpacing * node.children.length * depthFactor,
+                        baseAngleSpan
+                    );
+                    
+                    const startAngle = angle - angleSpan / 2;
+                    const angleStep = node.children.length > 1 ? angleSpan / (node.children.length - 1) : 0;
+
+                    node.children.forEach((child, index) => {
+                        const childAngle = startAngle + index * angleStep;
+                        
+                        // Calculate position with smart viewport constraints
+                        let adjustedRadius = childRadius;
+                        let childX, childY;
+                        
+                        // Calculate initial position
+                        childX = node.x + adjustedRadius * Math.cos(childAngle);
+                        childY = node.y + adjustedRadius * Math.sin(childAngle);
+                        
+                        // Apply bounds checking with margin
+                        const margin = 100;
+                        const maxX = 1200 - margin;
+                        const maxY = 800 - margin;
+                        
+                        // If outside bounds, adjust position intelligently
+                        if (childX < margin || childX > maxX || childY < margin || childY > maxY) {
+                            // Reduce radius progressively until within bounds
+                            while ((childX < margin || childX > maxX || childY < margin || childY > maxY) && adjustedRadius > 40) {
+                                adjustedRadius *= 0.85;
+                                childX = node.x + adjustedRadius * Math.cos(childAngle);
+                                childY = node.y + adjustedRadius * Math.sin(childAngle);
+                            }
+                            
+                            // Final bounds clamping if still outside
+                            childX = Math.max(margin, Math.min(maxX, childX));
+                            childY = Math.max(margin, Math.min(maxY, childY));
+                        }
+                        
+                        child.x = childX;
+                        child.y = childY;
+                        
+                        // Continue positioning children
+                        positionRadially(child, childAngle, adjustedRadius, childX, childY);
+                    });
+                }
             }
 
-            renderNode(root);
+            positionRadially(root);
+        }
+
+        // ======================
+        // RENDERING ENGINE MODULE
+        // ======================
+        
+        // Transform TreeNode to d3 hierarchy format
+        function transformToD3Format(root) {
+            function convertNode(node) {
+                if (node.text === 'Root') {
+                    if (node.children.length === 0) {
+                        return { name: 'Empty', children: [] };
+                    }
+                    if (node.children.length === 1) {
+                        return convertNode(node.children[0]);
+                    }
+                    return {
+                        name: 'Mind Map',
+                        children: node.children.map(child => convertNode(child))
+                    };
+                }
+                
+                const result = { name: node.text || 'Unnamed' };
+                if (node.children && node.children.length > 0) {
+                    result.children = node.children.map(child => convertNode(child));
+                }
+                return result;
+            }
+            return convertNode(root);
+        }
+
+        // Render mindmap using custom d3 implementation
+        function renderMindmap(root) {
+            const container = document.getElementById('mindmapContainer');
+            
+            try {
+                // Transform data to d3 format
+                const d3Data = transformToD3Format(root);
+                console.log('Rendering mindmap with data:', d3Data);
+                
+                // Create mindmap
+                createD3Mindmap(d3Data, container);
+                
+                // Update node count
+                const nodeCount = root.getNodeCount();
+                document.getElementById('nodeCount').textContent = nodeCount;
+                
+            } catch (error) {
+                console.error('Error rendering mindmap:', error);
+                container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Error: ' + error.message + '</div>';
+            }
         }
 
         // Get node color based on level
@@ -223,6 +765,10 @@
             return colors[level % colors.length];
         }
 
+        // ======================
+        // UI INTERACTION MODULE
+        // ======================
+        
         // Dark mode toggle
         function initializeDarkMode() {
             const darkModeToggle = document.getElementById('darkModeToggle');
@@ -238,19 +784,67 @@
             });
         }
 
+        // Debounce function for performance
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Update mindmap from markdown input
+        function updateMindmap() {
+            const markdownInput = document.getElementById('markdownInput');
+            const markdown = markdownInput.value;
+            
+            if (!markdown.trim()) {
+                // Clear mindmap if no input
+                const svg = document.getElementById('mindmapSVG');
+                svg.innerHTML = '';
+                return;
+            }
+
+            try {
+                // Parse and render mindmap
+                const tree = parseMarkdownToTree(markdown);
+                renderMindmap(tree);
+            } catch (error) {
+                console.error('Error updating mindmap:', error);
+                // Could show error message to user
+            }
+        }
+
+        // Debounced version for better performance
+        const debouncedUpdateMindmap = debounce(updateMindmap, 300);
+
         // Initialize application
         function init() {
             initializeDarkMode();
             
             // Load mock data
-            document.getElementById('markdownInput').value = mockMarkdown;
+            const markdownInput = document.getElementById('markdownInput');
+            markdownInput.value = mockMarkdown;
             
-            // Parse and render mindmap
-            const tree = parseMarkdownToTree(mockMarkdown);
-            calculateLayout(tree);
-            renderMindmap(tree);
+            // Add event listener for real-time updates
+            markdownInput.addEventListener('input', debouncedUpdateMindmap);
+            markdownInput.addEventListener('paste', () => {
+                // Small delay to ensure paste content is processed
+                setTimeout(debouncedUpdateMindmap, 50);
+            });
+            
+            // Initial render
+            updateMindmap();
         }
 
+        // ======================
+        // APPLICATION CONTROLLER
+        // ======================
+        
         // Start the application
         document.addEventListener('DOMContentLoaded', init);
     </script>
