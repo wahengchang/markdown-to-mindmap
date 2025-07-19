@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown to Mindmap</title>
+    <link rel="stylesheet" href="css/base.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- d3.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -15,6 +16,8 @@
     <script src="js/core/config.js"></script>
     <script src="js/tree/layout-engine.js"></script>
     <script src="js/rendering/d3-renderer.js"></script>
+    <script src="js/rendering/svg-exporter.js"></script>
+    <script src="js/ui/components.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -200,6 +203,34 @@
             </div>
         </div>
     </footer>
+
+    <script>
+    // --- SVG/HTML Export Button Handlers ---
+    document.addEventListener('DOMContentLoaded', function () {
+        // Wait for svg-exporter.js to be loaded
+        function getSVGElement() {
+            // Try to find the main mindmap SVG inside #mindmapContainer
+            return document.querySelector('#mindmapContainer svg');
+        }
+        const svgBtn = document.getElementById('downloadSvgBtn');
+        const htmlBtn = document.getElementById('downloadHtmlBtn');
+        if (svgBtn && typeof exportAsSVG === 'function') {
+            svgBtn.addEventListener('click', function () {
+                const svg = getSVGElement();
+                if (svg) exportAsSVG(svg);
+                else alert('No mindmap SVG found to export.');
+            });
+        }
+        if (htmlBtn && typeof exportAsHTML === 'function') {
+            htmlBtn.addEventListener('click', function () {
+                const svg = getSVGElement();
+                if (svg) exportAsHTML(svg);
+                else alert('No mindmap SVG found to export.');
+            });
+        }
+    });
+    </script>
+
     
     <!-- Toast Notifications -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
@@ -528,20 +559,7 @@
         // UI INTERACTION MODULE
         // ======================
         
-        // Dark mode toggle
-        function initializeDarkMode() {
-            const darkModeToggle = document.getElementById('darkModeToggle');
-            const isDark = localStorage.getItem('darkMode') === 'true';
-            
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-            }
-
-            darkModeToggle.addEventListener('click', () => {
-                document.documentElement.classList.toggle('dark');
-                localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-            });
-        }
+        // Dark mode toggle - now handled by UI Components module
 
         // Debounce function for performance
         function debounce(func, wait) {
@@ -583,7 +601,10 @@
 
         // Initialize application
         function init() {
-            initializeDarkMode();
+            // Initialize UI Components module
+            if (window.MarkdownMindmap && window.MarkdownMindmap.UIComponents) {
+                window.MarkdownMindmap.UIComponents.init();
+            }
             
             // Load mock data
             const markdownInput = document.getElementById('markdownInput');
@@ -596,8 +617,57 @@
                 setTimeout(debouncedUpdateMindmap, 50);
             });
             
+            // Setup event listeners for UI components
+            setupUIEventListeners();
+            
             // Initial render
             updateMindmap();
+        }
+        
+        // Setup event listeners for UI component integration
+        function setupUIEventListeners() {
+            // Listen for events dispatched by UI components
+            document.addEventListener('centerNode', handleCenterNode);
+            document.addEventListener('filterNodes', handleFilterNodes);
+            document.addEventListener('zoom', handleZoom);
+            document.addEventListener('download', handleDownload);
+        }
+        
+        // Event handlers for UI component events
+        function handleCenterNode() {
+            // Center the mindmap view
+            console.log('Centering node...');
+        }
+        
+        function handleFilterNodes(event) {
+            const filter = event.detail;
+            console.log('Filtering nodes:', filter);
+            // Implement node filtering logic
+        }
+        
+        function handleZoom(event) {
+            const action = event.detail;
+            console.log('Zoom action:', action);
+            // Implement zoom functionality
+        }
+        
+        function handleDownload(event) {
+            const format = event.detail;
+            if (format === 'svg') {
+                const svg = document.querySelector('#mindmapContainer svg');
+                if (svg && typeof exportAsSVG === 'function') {
+                    exportAsSVG(svg);
+                } else {
+                    window.MarkdownMindmap.UIComponents.showNotification('No mindmap SVG found to export', 'error');
+                }
+            } else if (format === 'html') {
+                const svg = document.querySelector('#mindmapContainer svg');
+                if (svg && typeof exportAsHTML === 'function') {
+                    exportAsHTML(svg);
+                } else {
+                    window.MarkdownMindmap.UIComponents.showNotification('No mindmap SVG found to export', 'error');
+                }
+            }
         }
 
         // ======================
