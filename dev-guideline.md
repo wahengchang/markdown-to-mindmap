@@ -30,6 +30,8 @@
 ## JavaScript
 
 - Organize by functionality (core parsing, UI, event handlers)
+- **D3.js Integration:** Custom tree layout using d3.tree() and d3.hierarchy()
+- **Rendering Engine:** SVG-based visualization with nodes and links
 - Optimize for performance (debounce, efficient DOM operations)
 - Keep bundle size under limit (150KB gzipped)
 
@@ -50,8 +52,9 @@
 
 - **File Structure:** Single `public/index.html` with embedded CSS/JS
 - **Tree Structure:** TreeNode class with parent-child relationships
-- **Layout Algorithm:** Hierarchical positioning with automatic spacing
-- **Rendering:** SVG-based mindmap with responsive design
+- **Layout Algorithm:** D3.js tree layout with hierarchical positioning
+- **Rendering:** Custom D3.js SVG mindmap implementation
+- **Dependencies:** D3.js v7.9.0 via cdnjs.cloudflare.com CDN
 - **Styling:** Tailwind CSS via CDN, dark mode support
 - **Development Server:** Uses `npx serve` for local testing (port 5000)
 
