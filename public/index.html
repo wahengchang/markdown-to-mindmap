@@ -7,6 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- d3.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+    
+    <!-- Modular JavaScript Files -->
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/tree/tree-node.js"></script>
+    <script src="js/core/parser.js"></script>
+    <script src="js/core/config.js"></script>
+    <script src="js/tree/layout-engine.js"></script>
+    <script src="js/rendering/d3-renderer.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -401,221 +409,14 @@
             }
         }
 
-        // Enhanced Markdown parsing with support for complex features
-        function parseMarkdownToTree(markdown) {
-            const lines = markdown.split('\n');
-            const root = new TreeNode('Root', 0);
-            const stack = [root];
-            let inCodeBlock = false;
-            let codeBlockContent = '';
-            let codeBlockLanguage = '';
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmedLine = line.trim();
-
-                // Skip empty lines
-                if (!trimmedLine) continue;
-
-                // Handle code blocks
-                if (trimmedLine.startsWith('```')) {
-                    if (!inCodeBlock) {
-                        // Start of code block
-                        inCodeBlock = true;
-                        codeBlockLanguage = trimmedLine.substring(3).trim();
-                        codeBlockContent = '';
-                    } else {
-                        // End of code block
-                        inCodeBlock = false;
-                        const codeNode = new TreeNode(`Code: ${codeBlockLanguage}`, stack[stack.length - 1].level + 1);
-                        codeNode.type = 'code';
-                        codeNode.language = codeBlockLanguage;
-                        codeNode.content = codeBlockContent;
-                        stack[stack.length - 1].addChild(codeNode);
-                        codeBlockContent = '';
-                    }
-                    continue;
-                }
-
-                // If inside code block, accumulate content
-                if (inCodeBlock) {
-                    codeBlockContent += line + '\n';
-                    continue;
-                }
-
-                // Handle headers
-                const headerMatch = line.match(/^(#+)\s+(.+)$/);
-                if (headerMatch) {
-                    const level = headerMatch[1].length;
-                    const text = headerMatch[2];
-                    const node = new TreeNode(text, level);
-                    node.type = 'header';
-
-                    // Find correct parent
-                    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
-                        stack.pop();
-                    }
-
-                    stack[stack.length - 1].addChild(node);
-                    stack.push(node);
-                    continue;
-                }
-
-                // Handle unordered lists
-                const unorderedListMatch = line.match(/^(\s*)[-*+]\s+(.+)$/);
-                if (unorderedListMatch) {
-                    const indent = unorderedListMatch[1].length;
-                    const text = unorderedListMatch[2];
-                    const listLevel = Math.floor(indent / 2) + stack[stack.length - 1].level + 1;
-                    const node = new TreeNode(text, listLevel);
-                    node.type = 'list-item';
-                    node.listType = 'unordered';
-
-                    // Find correct parent based on indentation
-                    while (stack.length > 1 && stack[stack.length - 1].level >= listLevel) {
-                        stack.pop();
-                    }
-
-                    stack[stack.length - 1].addChild(node);
-                    continue;
-                }
-
-                // Handle ordered lists
-                const orderedListMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
-                if (orderedListMatch) {
-                    const indent = orderedListMatch[1].length;
-                    const text = orderedListMatch[2];
-                    const listLevel = Math.floor(indent / 2) + stack[stack.length - 1].level + 1;
-                    const node = new TreeNode(text, listLevel);
-                    node.type = 'list-item';
-                    node.listType = 'ordered';
-
-                    // Find correct parent based on indentation
-                    while (stack.length > 1 && stack[stack.length - 1].level >= listLevel) {
-                        stack.pop();
-                    }
-
-                    stack[stack.length - 1].addChild(node);
-                    continue;
-                }
-
-                // Handle checkboxes
-                const checkboxMatch = line.match(/^(\s*)[-*+]\s+\[([x\s])\]\s+(.+)$/);
-                if (checkboxMatch) {
-                    const indent = checkboxMatch[1].length;
-                    const isChecked = checkboxMatch[2].toLowerCase() === 'x';
-                    const text = checkboxMatch[3];
-                    const listLevel = Math.floor(indent / 2) + stack[stack.length - 1].level + 1;
-                    const node = new TreeNode(text, listLevel);
-                    node.type = 'checkbox';
-                    node.checked = isChecked;
-
-                    // Find correct parent based on indentation
-                    while (stack.length > 1 && stack[stack.length - 1].level >= listLevel) {
-                        stack.pop();
-                    }
-
-                    stack[stack.length - 1].addChild(node);
-                    continue;
-                }
-
-                // Handle table rows (simple detection)
-                if (line.includes('|') && !line.startsWith('|')) {
-                    const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
-                    if (cells.length > 1) {
-                        const tableNode = new TreeNode(`Table: ${cells[0]} | ${cells[1]}`, stack[stack.length - 1].level + 1);
-                        tableNode.type = 'table';
-                        tableNode.cells = cells;
-                        stack[stack.length - 1].addChild(tableNode);
-                        continue;
-                    }
-                }
-
-                // Handle math expressions (LaTeX)
-                if (line.includes('$') && !line.startsWith('$')) {
-                    const mathMatch = line.match(/\$(.*?)\$/);
-                    if (mathMatch) {
-                        const mathNode = new TreeNode(`Math: ${mathMatch[1]}`, stack[stack.length - 1].level + 1);
-                        mathNode.type = 'math';
-                        mathNode.formula = mathMatch[1];
-                        stack[stack.length - 1].addChild(mathNode);
-                        continue;
-                    }
-                }
-
-                // Handle regular text paragraphs
-                if (trimmedLine && !trimmedLine.startsWith('#')) {
-                    const textNode = new TreeNode(trimmedLine, stack[stack.length - 1].level + 1);
-                    textNode.type = 'text';
-                    stack[stack.length - 1].addChild(textNode);
-                }
-            }
-
-            return root;
-        }
+        // Use modular parser - function now available from parser.js
+        const parseMarkdownToTree = window.MarkdownMindmap.Parser.parseMarkdownToTree;
 
         // ======================
         // D3 MINDMAP RENDERING MODULE
         // ======================
         
-        // Custom d3-based mindmap implementation
-        function createD3Mindmap(data, container) {
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            
-            // Clear container
-            d3.select(container).selectAll("*").remove();
-            
-            // Create SVG
-            const svg = d3.select(container)
-                .append("svg")
-                .attr("width", width)
-                .attr("height", height);
-            
-            const g = svg.append("g");
-            
-            // Create tree layout
-            const tree = d3.tree().size([width - 160, height - 160]);
-            
-            // Convert data to hierarchy
-            const root = d3.hierarchy(data);
-            tree(root);
-            
-            // Create links
-            g.selectAll(".link")
-                .data(root.links())
-                .enter().append("path")
-                .attr("class", "link")
-                .attr("d", d3.linkHorizontal()
-                    .x(d => d.y + 80)
-                    .y(d => d.x + 80))
-                .style("fill", "none")
-                .style("stroke", "#ccc")
-                .style("stroke-width", 2);
-            
-            // Create nodes
-            const node = g.selectAll(".node")
-                .data(root.descendants())
-                .enter().append("g")
-                .attr("class", "node")
-                .attr("transform", d => `translate(${d.y + 80},${d.x + 80})`);
-            
-            node.append("circle")
-                .attr("r", 6)
-                .style("fill", d => d.depth === 0 ? "#69b3a2" : "#404040")
-                .style("stroke", "#fff")
-                .style("stroke-width", 2);
-            
-            node.append("text")
-                .attr("dy", ".35em")
-                .attr("x", d => d.children ? -13 : 13)
-                .style("text-anchor", d => d.children ? "end" : "start")
-                .style("font-size", "12px")
-                .style("fill", "#333")
-                .text(d => d.data.name || d.data.text || "");
-            
-            return svg.node();
-        }
+        // createD3Mindmap function now available from d3-renderer.js module
 
         // ======================
         // LAYOUT ENGINE MODULE
@@ -712,52 +513,10 @@
         // RENDERING ENGINE MODULE
         // ======================
         
-        // Transform TreeNode to d3 hierarchy format
-        function transformToD3Format(root) {
-            function convertNode(node) {
-                if (node.text === 'Root') {
-                    if (node.children.length === 0) {
-                        return { name: 'Empty', children: [] };
-                    }
-                    if (node.children.length === 1) {
-                        return convertNode(node.children[0]);
-                    }
-                    return {
-                        name: 'Mind Map',
-                        children: node.children.map(child => convertNode(child))
-                    };
-                }
-                
-                const result = { name: node.text || 'Unnamed' };
-                if (node.children && node.children.length > 0) {
-                    result.children = node.children.map(child => convertNode(child));
-                }
-                return result;
-            }
-            return convertNode(root);
-        }
-
-        // Render mindmap using custom d3 implementation
-        function renderMindmap(root) {
-            const container = document.getElementById('mindmapContainer');
-            
-            try {
-                // Transform data to d3 format
-                const d3Data = transformToD3Format(root);
-                console.log('Rendering mindmap with data:', d3Data);
-                
-                // Create mindmap
-                createD3Mindmap(d3Data, container);
-                
-                // Update node count
-                const nodeCount = root.getNodeCount();
-                document.getElementById('nodeCount').textContent = nodeCount;
-                
-            } catch (error) {
-                console.error('Error rendering mindmap:', error);
-                container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Error: ' + error.message + '</div>';
-            }
-        }
+        // Use modular renderer - functions now available from d3-renderer.js
+        const renderMindmap = window.MarkdownMindmap.Renderer.renderMindmap;
+        const transformToD3Format = window.MarkdownMindmap.Renderer.transformToD3Format;
+        const createD3Mindmap = window.MarkdownMindmap.Renderer.createD3Mindmap;
 
         // Get node color based on level
         function getNodeColor(level) {
