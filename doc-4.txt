@@ -1,7 +1,0 @@
-Step 4: Implement Visual UI/UX
-
-- Design and implement mind map visualization (nodes, edges, layout).
-- Add interactivity (expand/collapse, drag, zoom, etc.).
-- Refine input/output UI for Markdown and mind map.
-- Polish Home page and shared components.
-- Document UI/UX decisions and component structure.
