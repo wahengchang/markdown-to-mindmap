@@ -32,7 +32,11 @@
                 };
             }
             
-            const result = { name: node.text || 'Unnamed' };
+            const result = { 
+                name: node.text || 'Unnamed',
+                detail: node.detail || '',
+                isLeaf: !node.children || node.children.length === 0
+            };
             if (node.children && node.children.length > 0) {
                 result.children = node.children.map(child => convertNode(child));
             }
@@ -133,9 +137,36 @@
             .style("fill", "currentColor")
             .style("user-select", "none")
             .style("pointer-events", "none")
-            .text(d => {
-                const text = d.data.name || d.data.text || "";
-                return text.length > 30 ? text.substring(0, 27) + "..." : text;
+            .each(function(d) {
+                const textElement = d3.select(this);
+                const name = d.data.name || d.data.text || "";
+                const detail = d.data.detail || "";
+                const isLeaf = d.data.isLeaf;
+                
+                // For leaf nodes with detail, show both name and detail
+                if (isLeaf && detail.trim()) {
+                    // Add the header title
+                    textElement.append("tspan")
+                        .attr("x", d.children ? -13 : 13)
+                        .attr("dy", "0em")
+                        .style("font-weight", "bold")
+                        .text(name.length > 25 ? name.substring(0, 22) + "..." : name);
+                    
+                    // Add the detail content on new lines
+                    const detailLines = detail.split('\n').filter(line => line.trim());
+                    detailLines.forEach((line, index) => {
+                        textElement.append("tspan")
+                            .attr("x", d.children ? -13 : 13)
+                            .attr("dy", "1.2em")
+                            .style("font-size", `${fontSize - 1}px`)
+                            .style("font-weight", "normal")
+                            .style("fill", "#666")
+                            .text(line.length > 30 ? line.substring(0, 27) + "..." : line);
+                    });
+                } else {
+                    // For non-leaf nodes, just show the name
+                    textElement.text(name.length > 30 ? name.substring(0, 27) + "..." : name);
+                }
             });
         
         // Add hover effects
@@ -147,20 +178,32 @@
                     .attr("r", d.depth === 0 ? 10 : 8)
                     .style("stroke-width", 3);
                 
-                // Show tooltip for long text
+                // Show tooltip for truncated text or full detail content
                 const text = d.data.name || d.data.text || "";
-                if (text.length > 30) {
+                const detail = d.data.detail || "";
+                const isLeaf = d.data.isLeaf;
+                
+                if (text.length > 30 || (isLeaf && detail.trim())) {
                     const tooltip = d3.select("body").append("div")
                         .attr("class", "mindmap-tooltip")
                         .style("position", "absolute")
-                        .style("background", "rgba(0,0,0,0.8)")
+                        .style("background", "rgba(0,0,0,0.9)")
                         .style("color", "white")
-                        .style("padding", "8px")
-                        .style("border-radius", "4px")
+                        .style("padding", "12px")
+                        .style("border-radius", "6px")
                         .style("font-size", "12px")
                         .style("pointer-events", "none")
                         .style("z-index", "1000")
-                        .text(text);
+                        .style("max-width", "300px")
+                        .style("white-space", "pre-wrap");
+                    
+                    // Show full content in tooltip
+                    let tooltipContent = text;
+                    if (isLeaf && detail.trim()) {
+                        tooltipContent = `${text}\n\n${detail}`;
+                    }
+                    
+                    tooltip.text(tooltipContent);
                     
                     tooltip
                         .style("left", (event.pageX + 10) + "px")
