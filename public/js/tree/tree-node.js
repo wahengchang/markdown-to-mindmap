@@ -17,7 +17,8 @@
          * @param {number} level - The depth level in the tree (default: 0)
          */
         constructor(text, level = 0) {
-            this.text = text;
+            this.text = text;              // Title/heading for display
+            this.detail = '';              // Detailed content for leaf nodes
             this.level = level;
             this.children = [];
             this.parent = null;
@@ -143,6 +144,7 @@
             return {
                 id: this.id,
                 text: this.text,
+                detail: this.detail,
                 level: this.level,
                 type: this.type,
                 collapsed: this.collapsed,
@@ -163,6 +165,7 @@
 
             const node = new TreeNode(json.text || '', json.level || 0);
             node.id = json.id || TreeNode.generateId();
+            node.detail = json.detail || '';
             node.type = json.type || 'text';
             node.collapsed = json.collapsed || false;
             node.metadata = json.metadata || {};

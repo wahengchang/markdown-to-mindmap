@@ -270,7 +270,10 @@
         try {
             // Use parser if available
             if (window.MarkdownMindmap?.Parser?.parseMarkdownToTree) {
-                const tree = window.MarkdownMindmap.Parser.parseMarkdownToTree(markdown);
+                // Enable filtering for cleaner mindmap visualization (matches target behavior)
+                const tree = window.MarkdownMindmap.Parser.parseMarkdownToTree(markdown, { 
+                    filterForMindmap: true 
+                });
                 renderMindmap(tree, container);
             } else {
                 throw new Error('Markdown parser not available');

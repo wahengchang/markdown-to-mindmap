@@ -12,10 +12,13 @@
     /**
      * Parse markdown text into a hierarchical tree structure
      * @param {string} markdown - Raw markdown content
+     * @param {Object} options - Parsing options
+     * @param {boolean} options.filterForMindmap - Filter out text nodes for cleaner mindmap (default: false)
+     * @param {Array<string>} options.includeTypes - Node types to include in mindmap mode (default: ['header', 'list-item', 'code', 'table', 'math'])
      * @returns {TreeNode} Root node containing parsed tree structure
      * @throws {Error} If TreeNode class is not available
      */
-    function parseMarkdownToTree(markdown) {
+    function parseMarkdownToTree(markdown, options = {}) {
         // Ensure TreeNode is available
         if (typeof TreeNode === 'undefined') {
             throw new Error('TreeNode class is required but not available');
@@ -169,7 +172,122 @@
             }
         }
 
+        // Apply filtering if requested
+        if (options.filterForMindmap) {
+            return filterTreeForMindmap(root, options);
+        }
+
         return root;
+    }
+
+    /**
+     * Filter tree nodes for mindmap visualization
+     * Only keeps structural headers and moves detailed content to leaf nodes
+     * @param {TreeNode} root - Root node of the tree
+     * @param {Object} options - Filtering options
+     * @returns {TreeNode} Filtered tree with clean structure
+     */
+    function filterTreeForMindmap(root, options = {}) {
+        // Step 1: Identify leaf nodes (nodes that will have no structural children)
+        function identifyLeafNodes(node) {
+            if (node.text === 'Root') {
+                // Process children to identify leaves
+                for (let child of node.children) {
+                    identifyLeafNodes(child);
+                }
+                return;
+            }
+            
+            // Count structural children (headers only)
+            let structuralChildrenCount = 0;
+            for (let child of node.children) {
+                if (child.type === 'header') {
+                    structuralChildrenCount++;
+                    identifyLeafNodes(child);
+                }
+            }
+            
+            // Mark as leaf if no structural children
+            node._isLeaf = (structuralChildrenCount === 0);
+        }
+        
+        // Step 2: Build filtered tree with detail property
+        function buildFilteredTree(node) {
+            if (node.text === 'Root') {
+                const filteredRoot = new TreeNode(node.text, node.level);
+                filteredRoot.type = node.type;
+                filteredRoot.id = node.id;
+                
+                // Only add header children
+                for (let child of node.children) {
+                    if (child.type === 'header') {
+                        const filteredChild = buildFilteredTree(child);
+                        if (filteredChild) {
+                            filteredRoot.addChild(filteredChild);
+                        }
+                    }
+                }
+                return filteredRoot;
+            }
+            
+            // Only process header nodes
+            if (node.type !== 'header') {
+                return null;
+            }
+            
+            // Create filtered header node
+            const filteredNode = new TreeNode(node.text, node.level);
+            filteredNode.type = node.type;
+            filteredNode.id = node.id;
+            
+            // If this is a leaf node, collect all detailed content
+            if (node._isLeaf) {
+                const detailParts = [];
+                
+                // Collect text content
+                for (let child of node.children) {
+                    if (child.type === 'text') {
+                        detailParts.push(child.text);
+                    } else if (child.type === 'list-item') {
+                        detailParts.push(`- ${child.text}`);
+                    } else if (child.type === 'code') {
+                        detailParts.push(`\`\`\`${child.language || ''}\n${child.content}\`\`\``);
+                    }
+                }
+                
+                // Set detail property
+                filteredNode.detail = detailParts.join('\n');
+            } else {
+                // Non-leaf: only add header children, no detail
+                for (let child of node.children) {
+                    if (child.type === 'header') {
+                        const filteredChild = buildFilteredTree(child);
+                        if (filteredChild) {
+                            filteredNode.addChild(filteredChild);
+                        }
+                    }
+                }
+            }
+            
+            return filteredNode;
+        }
+        
+        // Execute the algorithm
+        identifyLeafNodes(root);
+        const result = buildFilteredTree(root);
+        
+        // Clean up temporary markers
+        function cleanupMarkers(node) {
+            delete node._isLeaf;
+            if (node.children) {
+                for (let child of node.children) {
+                    cleanupMarkers(child);
+                }
+            }
+        }
+        cleanupMarkers(root);
+        
+        return result;
     }
 
     /**
@@ -242,7 +360,8 @@
         window.MarkdownMindmap.Parser = {
             parseMarkdownToTree,
             validateMarkdown,
-            getParsingStats
+            getParsingStats,
+            filterTreeForMindmap
         };
     }
 
@@ -251,7 +370,8 @@
         module.exports = {
             parseMarkdownToTree,
             validateMarkdown,
-            getParsingStats
+            getParsingStats,
+            filterTreeForMindmap
         };
     }
 
