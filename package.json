@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "dev": "npx serve --no-clipboard -l 5000 ./public",
     "start": "npx serve --no-clipboard -l 5000 ./public"
   },
@@ -18,5 +20,9 @@
     "url": "https://github.com/wahengchang/markdown-to-mindmap/issues"
   },
   "homepage": "https://github.com/wahengchang/markdown-to-mindmap#readme",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "serve": "^14.2.4"
+  }
 }

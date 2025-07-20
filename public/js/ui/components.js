@@ -29,7 +29,6 @@ window.MarkdownMindmap.UIComponents = (function() {
 
         initializeHeader();
         initializeNavigation();
-        initializeToolbar();
         initializeSplitPane();
         initializeCanvasControls();
         initializeStatusBar();
@@ -50,7 +49,8 @@ window.MarkdownMindmap.UIComponents = (function() {
 
         // Add dynamic header functionality
         addHeaderScrollBehavior();
-        initializeThemeToggle();
+        // Dark mode is now handled in main.js
+        // initializeThemeToggle();
     }
 
     /**
@@ -104,46 +104,7 @@ window.MarkdownMindmap.UIComponents = (function() {
         }
     }
 
-    /**
-     * Initialize toolbar functionality
-     */
-    function initializeToolbar() {
-        // Open URL button
-        const openUrlBtn = document.getElementById('openUrlBtn');
-        if (openUrlBtn) {
-            openUrlBtn.addEventListener('click', handleOpenUrl);
-        }
 
-        // Solid color toggle
-        const solidColorBtn = document.getElementById('solidColorBtn');
-        if (solidColorBtn) {
-            solidColorBtn.addEventListener('click', handleSolidColorToggle);
-        }
-
-        // Text wrap toggle
-        const wrapTextBtn = document.getElementById('wrapTextBtn');
-        if (wrapTextBtn) {
-            wrapTextBtn.addEventListener('click', handleTextWrapToggle);
-        }
-
-        // Center node button
-        const centerNodeBtn = document.getElementById('centerNodeBtn');
-        if (centerNodeBtn) {
-            centerNodeBtn.addEventListener('click', handleCenterNode);
-        }
-
-        // Filter input
-        const filterInput = document.getElementById('filterInput');
-        if (filterInput) {
-            filterInput.addEventListener('input', handleFilterInput);
-        }
-
-        // Learn more button
-        const learnMoreBtn = document.getElementById('learnMoreBtn');
-        if (learnMoreBtn) {
-            learnMoreBtn.addEventListener('click', handleLearnMore);
-        }
-    }
 
     /**
      * Initialize split-pane layout with resize functionality
@@ -600,36 +561,6 @@ window.MarkdownMindmap.UIComponents = (function() {
 
     // Event Handlers
     
-    function handleOpenUrl() {
-        const url = prompt('Enter URL to load markdown from:');
-        if (url) {
-            showNotification('URL loading not implemented yet', 'warning');
-        }
-    }
-
-    function handleSolidColorToggle() {
-        showNotification('Solid color mode toggled', 'info');
-    }
-
-    function handleTextWrapToggle() {
-        showNotification('Text wrap toggled', 'info');
-    }
-
-    function handleCenterNode() {
-        // Dispatch event for other modules to handle
-        document.dispatchEvent(new CustomEvent('centerNode'));
-        showNotification('Centering active node', 'info');
-    }
-
-    function handleFilterInput(e) {
-        const filter = e.target.value;
-        // Dispatch event for other modules to handle
-        document.dispatchEvent(new CustomEvent('filterNodes', { detail: filter }));
-    }
-
-    function handleLearnMore() {
-        showModal('docs', createDocsModal());
-    }
 
     function handleZoom(action) {
         // Dispatch event for other modules to handle
