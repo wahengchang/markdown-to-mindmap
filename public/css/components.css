@@ -112,66 +112,7 @@
   height: 1.25rem;
 }
 
-/* ======================
-   TOOLBAR COMPONENTS
-   ====================== */
-
-.app-toolbar {
-  background-color: var(--color-surface-secondary);
-  border-top: 1px solid var(--color-border);
-  padding: var(--spacing-sm) var(--spacing-md);
-}
-
-.app-toolbar__container {
-  max-width: var(--max-content-width);
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-}
-
-.toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.toolbar-btn:hover {
-  color: var(--color-text-primary);
-  background-color: var(--color-border);
-}
-
-.toolbar-btn svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.toolbar-btn.active {
-  color: var(--color-primary);
-  background-color: rgb(59 130 246 / 0.1);
-}
-
 /* Filter Input */
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
 .filter-label {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);

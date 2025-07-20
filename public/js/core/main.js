@@ -130,17 +130,37 @@
     function initializeDarkMode() {
         const darkModeToggle = document.getElementById('darkModeToggle');
         if (!darkModeToggle) return;
-
-        const isDark = localStorage.getItem('darkMode') === 'true';
         
-        if (isDark) {
-            document.documentElement.classList.add('dark');
+        // Check if user has a saved preference
+        const savedPreference = localStorage.getItem('darkMode');
+        
+        // If no saved preference, check system preference
+        if (savedPreference === null) {
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.toggle('dark', prefersDark);
+            localStorage.setItem('darkMode', prefersDark);
+        } else {
+            // Use saved preference
+            const isDark = savedPreference === 'true';
+            document.documentElement.classList.toggle('dark', isDark);
         }
 
+        // Add listener for dark mode toggle button
         darkModeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
             localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
         });
+        
+        // Listen for system preference changes
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                // Only update if user hasn't set a preference
+                if (localStorage.getItem('darkMode') === null) {
+                    document.documentElement.classList.toggle('dark', e.matches);
+                    localStorage.setItem('darkMode', e.matches);
+                }
+            });
+        }
     }
 
     /**

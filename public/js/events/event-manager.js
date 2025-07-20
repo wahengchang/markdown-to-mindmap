@@ -211,23 +211,16 @@
             const zoomInBtn = document.getElementById('zoomInBtn');
             const zoomOutBtn = document.getElementById('zoomOutBtn');
             const resetZoomBtn = document.getElementById('resetZoomBtn');
-            const centerNodeBtn = document.getElementById('centerNodeBtn');
+
             const fullscreenBtn = document.getElementById('fullscreenBtn');
 
             if (zoomInBtn) this.addListener(zoomInBtn, 'click', () => this.zoomIn());
             if (zoomOutBtn) this.addListener(zoomOutBtn, 'click', () => this.zoomOut());
             if (resetZoomBtn) this.addListener(resetZoomBtn, 'click', () => this.resetZoom());
-            if (centerNodeBtn) this.addListener(centerNodeBtn, 'click', () => this.centerView());
+
             if (fullscreenBtn) this.addListener(fullscreenBtn, 'click', () => this.toggleFullscreen());
 
-            // Filter input
-            const filterInput = document.getElementById('filterInput');
-            if (filterInput) {
-                const debouncedFilter = Performance.debounce ? 
-                    Performance.debounce(this.handleFilter.bind(this), 300) :
-                    this.handleFilter.bind(this);
-                this.addListener(filterInput, 'input', debouncedFilter);
-            }
+
         }
 
         /**
