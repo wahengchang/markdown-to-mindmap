@@ -7,6 +7,7 @@
     <!-- CSS Files -->
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/theme-selector.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- d3.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -21,6 +22,8 @@
     <script src="js/rendering/svg-exporter.js"></script>
     <script src="js/events/event-manager.js"></script>
     <script src="js/ui/components.js"></script>
+    <script src="js/ui/theme-manager.js"></script>
+    <script src="js/ui/theme-selector.js"></script>
     <script src="js/core/main.js"></script>
     <script>
         tailwind.config = {
@@ -46,6 +49,11 @@
                     </nav>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <button id="themePickerBtn" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" aria-label="Select theme">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+                        </svg>
+                    </button>
                     <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" aria-label="Toggle dark mode">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
@@ -161,5 +169,49 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
+    <!-- Theme Selector Initialization -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize theme manager if available
+            if (window.MarkdownMindmap?.ThemeManager) {
+                window.MarkdownMindmap.ThemeManager.initializeThemeManager();
+            }
+            
+            // Initialize theme selector if available
+            if (window.MarkdownMindmap?.ThemeSelector) {
+                window.MarkdownMindmap.ThemeSelector.init({
+                    debounceTime: 100,
+                    onPreview: function(themeId) {
+                        // For previewing themes on hover (temporary)
+                        if (window.MarkdownMindmap?.ThemeManager) {
+                            window.MarkdownMindmap.ThemeManager.switchTheme(themeId);
+                        }
+                    },
+                    onSelect: function(themeId) {
+                        // For permanently selecting a theme
+                        if (window.MarkdownMindmap?.ThemeManager) {
+                            window.MarkdownMindmap.ThemeManager.switchTheme(themeId);
+                        }
+                    }
+                });
+            }
+            
+            // Dark mode toggle functionality
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('click', function() {
+                    document.documentElement.classList.toggle('dark');
+                    const isDark = document.documentElement.classList.contains('dark');
+                    localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+                });
+                
+                // Check for saved dark mode preference
+                const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+                if (savedDarkMode) {
+                    document.documentElement.classList.add('dark');
+                }
+            }
+        });
+    </script>
 </body>
 </html>

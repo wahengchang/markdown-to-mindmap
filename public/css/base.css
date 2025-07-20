@@ -8,24 +8,37 @@
    ====================== */
 
 :root {
-  /* Color System */
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-secondary: #64748b;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
+  /* Theme System - Default Professional Theme */
+  --theme-primary: #1e3a8a;
+  --theme-secondary: #475569;
+  --theme-accent: #3b82f6;
+  --theme-background: #ffffff;
+  --theme-text: #1f2937;
+  --theme-surface: #f8fafc;
+  --theme-border: #e2e8f0;
+  --theme-shadow: rgba(30, 58, 138, 0.1);
+  --theme-success: #059669;
+  --theme-warning: #d97706;
+  --theme-error: #dc2626;
   
-  /* Semantic Colors - Light Mode */
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
-  --color-surface-secondary: #f1f5f9;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #64748b;
-  --color-text-muted: #94a3b8;
-  --color-border: #e2e8f0;
-  --color-border-hover: #cbd5e1;
-  --color-focus-ring: #3b82f6;
+  /* Legacy Color System (for backward compatibility) */
+  --color-primary: var(--theme-primary);
+  --color-primary-hover: var(--theme-accent);
+  --color-secondary: var(--theme-secondary);
+  --color-success: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-danger: var(--theme-error);
+  
+  /* Semantic Colors - Updated to use theme system */
+  --color-background: var(--theme-background);
+  --color-surface: var(--theme-surface);
+  --color-surface-secondary: var(--theme-surface);
+  --color-text-primary: var(--theme-text);
+  --color-text-secondary: var(--theme-secondary);
+  --color-text-muted: var(--theme-secondary);
+  --color-border: var(--theme-border);
+  --color-border-hover: var(--theme-accent);
+  --color-focus-ring: var(--theme-accent);
   
   /* Typography */
   --font-family-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
