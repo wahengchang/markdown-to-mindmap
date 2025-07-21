@@ -28,6 +28,20 @@
         '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
     ];
 
+    // Vibrant connection colors for dark theme style
+    const VIBRANT_CONNECTION_COLORS = [
+        '#ff7043', // Orange
+        '#9c27b0', // Purple  
+        '#ffc107', // Yellow
+        '#03a9f4', // Blue
+        '#00bcd4', // Teal
+        '#4caf50', // Green
+        '#ff5722', // Deep Orange
+        '#673ab7', // Deep Purple
+        '#ff9800', // Amber
+        '#2196f3'  // Blue
+    ];
+
     // Data Schema Validators
     const SchemaValidator = {
         validateNodeData(nodeData) {
@@ -507,17 +521,65 @@
                 return true;
             });
             
+            // Create curved, vibrant connections
             g.selectAll(".link")
                 .data(filteredLinks)
                 .enter().append("path")
                 .attr("class", "link")
-                .attr("d", this.d3.linkHorizontal()
-                    .x(d => d.y + CONSTANTS.LAYOUT_PADDING)
-                    .y(d => d.x + CONSTANTS.LAYOUT_PADDING))
+                .attr("d", (d, i) => this._createCurvedPath(d, i))
                 .style("fill", "none")
-                .style("stroke", "#999")
-                .style("stroke-width", 2)
-                .style("stroke-opacity", 0.6);
+                .style("stroke", (d, i) => VIBRANT_CONNECTION_COLORS[i % VIBRANT_CONNECTION_COLORS.length])
+                .style("stroke-width", 3)
+                .style("stroke-opacity", 0.8)
+                .style("stroke-linecap", "round")
+                .style("filter", "drop-shadow(0 0 3px rgba(0,0,0,0.3))")
+                .style("transition", "all 0.3s ease");
+        }
+
+        /**
+         * Create curved path for vibrant connections
+         * @private
+         */
+        _createCurvedPath(link, index) {
+            const source = {
+                x: link.source.y + CONSTANTS.LAYOUT_PADDING,
+                y: link.source.x + CONSTANTS.LAYOUT_PADDING
+            };
+            const target = {
+                x: link.target.y + CONSTANTS.LAYOUT_PADDING,
+                y: link.target.x + CONSTANTS.LAYOUT_PADDING
+            };
+
+            // Calculate control points for smooth curves
+            const dx = target.x - source.x;
+            const dy = target.y - source.y;
+            
+            // Create varied curve styles based on index for visual interest
+            const curveVariation = index % 3;
+            let cp1x, cp1y, cp2x, cp2y;
+            
+            switch (curveVariation) {
+                case 0: // Standard curve
+                    cp1x = source.x + dx * 0.6;
+                    cp1y = source.y + dy * 0.2;
+                    cp2x = source.x + dx * 0.4;
+                    cp2y = target.y - dy * 0.2;
+                    break;
+                case 1: // High curve  
+                    cp1x = source.x + dx * 0.5;
+                    cp1y = source.y + dy * 0.3 - 40;
+                    cp2x = source.x + dx * 0.5;
+                    cp2y = target.y - dy * 0.3 - 40;
+                    break;
+                case 2: // Low curve
+                    cp1x = source.x + dx * 0.5;
+                    cp1y = source.y + dy * 0.3 + 40;
+                    cp2x = source.x + dx * 0.5;
+                    cp2y = target.y - dy * 0.3 + 40;
+                    break;
+            }
+            
+            return `M ${source.x},${source.y} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${target.x},${target.y}`;
         }
 
         _renderNodes(g, root, theme) {

@@ -218,6 +218,29 @@
                 contrastRatio: 4.5,
                 wcagLevel: 'AA'
             }
+        },
+
+        'vibrant-dark': {
+            name: 'Vibrant Dark',
+            description: 'Dark theme with vibrant curved connections and inline content',
+            category: 'creative',
+            colors: {
+                primary: '#ff7043',
+                secondary: '#9c27b0', 
+                accent: '#03a9f4',
+                background: '#1a1a1a',
+                text: '#ffffff',
+                surface: '#2a2a2a',
+                border: '#404040',
+                shadow: 'rgba(0, 0, 0, 0.8)',
+                success: '#4caf50',
+                warning: '#ffc107',
+                error: '#f44336'
+            },
+            accessibility: {
+                contrastRatio: 7.0,
+                wcagLevel: 'AAA'
+            }
         }
     };
 
