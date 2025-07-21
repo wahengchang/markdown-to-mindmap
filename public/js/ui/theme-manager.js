@@ -251,6 +251,7 @@
     function switchTheme(themeName) {
         return new Promise((resolve, reject) => {
             if (!THEMES[themeName]) {
+                console.error(`Theme '${themeName}' not found`);
                 reject(new Error(`Theme "${themeName}" not found`));
                 return;
             }
@@ -261,18 +262,22 @@
             document.documentElement.classList.add('theme-transitioning');
             
             // Apply new theme
+            console.log('  Applying theme to document:', THEMES[themeName].name);
             applyTheme(themeName);
             currentTheme = themeName;
+            console.log('  CSS variables updated');
             
             // Save preference
             saveThemePreference(themeName);
             
             // Notify callbacks
-            themeChangeCallbacks.forEach(callback => {
+            console.log(`  Calling ${themeChangeCallbacks.length} registered theme change callbacks`);
+            themeChangeCallbacks.forEach((callback, index) => {
                 try {
+                    console.log(`  Executing callback #${index + 1}`);
                     callback(themeName, THEMES[themeName]);
                 } catch (error) {
-                    console.warn('Theme change callback error:', error);
+                    console.error('  Error in theme change callback', error);
                 }
             });
             

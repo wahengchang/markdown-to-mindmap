@@ -34,6 +34,7 @@ window.MarkdownMindmap.UIComponents = (function() {
         initializeStatusBar();
         initializeNotifications();
         initializeModals();
+        initializeExpansionControls();
         setupKeyboardShortcuts();
         setupAccessibility();
 
@@ -652,6 +653,520 @@ window.MarkdownMindmap.UIComponents = (function() {
         }
     }
 
+    /**
+     * Expansion Control Manager Class
+     * Implements T013: Build node expansion/collapse controls with animations
+     */
+    class ExpansionControlManager {
+        constructor() {
+            this.eventBus = window.MindmapEvents || null;
+            this.nodeInteractions = window.TreeInteraction?.NodeInteractions || null;
+            this.expandedNodes = new Set();
+            this.animationConfig = {
+                expansionDuration: 300,
+                collapseDuration: 250,
+                staggerDelay: 50,
+                expansionEasing: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
+                collapseEasing: 'cubic-bezier(0.4, 0.0, 0.6, 1)',
+                fadeOpacity: true,
+                scaleEffect: true,
+                slideEffect: true,
+                useTransforms: true,
+                enableGPUAcceleration: true,
+                respectReducedMotion: true
+            };
+            
+            this.setupCSS();
+            this.registerEventHandlers();
+        }
+
+        /**
+         * Setup required CSS for expansion controls and animations
+         */
+        setupCSS() {
+            const style = document.createElement('style');
+            style.id = 'expansion-control-styles';
+            style.textContent = `
+                /* Expansion Control Styles */
+                .expansion-control {
+                    position: absolute;
+                    top: -8px;
+                    right: -8px;
+                    width: 16px;
+                    height: 16px;
+                    min-width: 44px; /* Touch target */
+                    min-height: 44px;
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    font-weight: bold;
+                    opacity: 0;
+                    transform: scale(0.8);
+                    transition: all 0.2s ease;
+                    z-index: 10;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                }
+
+                .expansion-control:hover {
+                    background: #2563eb;
+                    transform: scale(1.1);
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+                }
+
+                .expansion-control:active {
+                    transform: scale(0.95);
+                }
+
+                .expansion-control.expanded {
+                    background: #dc2626;
+                }
+
+                .expansion-control.expanded:hover {
+                    background: #b91c1c;
+                }
+
+                /* Show controls on node hover */
+                .mindmap-node:hover .expansion-control,
+                .mindmap-node.focused .expansion-control,
+                .mindmap-node.expanded .expansion-control {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+
+                /* Expandable content container */
+                .expandable-content {
+                    overflow: hidden;
+                    transition: all var(--expansion-duration, 300ms) var(--expansion-easing, ease);
+                    transform-origin: top center;
+                }
+
+                .expandable-content.collapsed {
+                    max-height: 0;
+                    opacity: 0;
+                    transform: scaleY(0);
+                }
+
+                .expandable-content.expanded {
+                    max-height: 500px; /* Adjust based on content */
+                    opacity: 1;
+                    transform: scaleY(1);
+                }
+
+                /* Respect reduced motion preference */
+                @media (prefers-reduced-motion: reduce) {
+                    .expansion-control,
+                    .expandable-content {
+                        transition: none !important;
+                        animation: none !important;
+                    }
+                }
+
+                /* High contrast mode support */
+                @media (prefers-contrast: high) {
+                    .expansion-control {
+                        border: 2px solid currentColor;
+                        background: ButtonFace;
+                        color: ButtonText;
+                    }
+                }
+
+                /* Dark mode adjustments */
+                .dark .expansion-control {
+                    background: #1e40af;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                }
+
+                .dark .expansion-control:hover {
+                    background: #1d4ed8;
+                }
+
+                .dark .expansion-control.expanded {
+                    background: #dc2626;
+                }
+
+                .dark .expansion-control.expanded:hover {
+                    background: #ef4444;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        /**
+         * Register event handlers for expansion controls
+         */
+        registerEventHandlers() {
+            if (!this.eventBus) {
+                console.warn('ExpansionControlManager: Event bus not available');
+                return;
+            }
+
+            // Listen for node events from T019
+            this.eventBus.on('node:click', this.handleNodeClick.bind(this));
+            this.eventBus.on('node:double-click', this.handleNodeDoubleClick.bind(this));
+            this.eventBus.on('node:expanded', this.handleNodeExpanded.bind(this));
+            this.eventBus.on('node:collapsed', this.handleNodeCollapsed.bind(this));
+        }
+
+        /**
+         * Add expansion control to a node element
+         * @param {HTMLElement} nodeElement - Node DOM element
+         * @param {Object} nodeData - Node data object
+         */
+        addExpansionControl(nodeElement, nodeData) {
+            if (!nodeElement || !nodeData) return;
+            
+            // Check if node has expandable content
+            if (!this.isNodeExpandable(nodeData)) return;
+
+            // Remove existing control
+            this.removeExpansionControl(nodeElement);
+
+            // Create expansion control button
+            const control = document.createElement('button');
+            control.className = 'expansion-control';
+            control.setAttribute('aria-label', 'Expand/Collapse node content');
+            control.setAttribute('aria-expanded', 'false');
+            control.setAttribute('data-node-id', nodeData.id);
+            
+            // Set initial icon
+            const isExpanded = this.expandedNodes.has(nodeData.id);
+            control.textContent = isExpanded ? '▼' : '▶';
+            control.setAttribute('aria-expanded', isExpanded.toString());
+            
+            if (isExpanded) {
+                control.classList.add('expanded');
+            }
+
+            // Add click handler
+            control.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                this.handleExpansionToggle(nodeData.id);
+            });
+
+            // Position the control
+            nodeElement.style.position = 'relative';
+            nodeElement.appendChild(control);
+
+            // Create expandable content container if it doesn't exist
+            this.ensureExpandableContent(nodeElement, nodeData);
+        }
+
+        /**
+         * Remove expansion control from node element
+         * @param {HTMLElement} nodeElement - Node DOM element
+         */
+        removeExpansionControl(nodeElement) {
+            if (!nodeElement) return;
+            
+            const existingControl = nodeElement.querySelector('.expansion-control');
+            if (existingControl) {
+                existingControl.remove();
+            }
+        }
+
+        /**
+         * Update control state for a node
+         * @param {string} nodeId - Node ID
+         * @param {boolean} expanded - Expansion state
+         */
+        updateControlState(nodeId, expanded) {
+            const control = document.querySelector(`[data-node-id="${nodeId}"].expansion-control`);
+            if (!control) return;
+
+            control.textContent = expanded ? '▼' : '▶';
+            control.setAttribute('aria-expanded', expanded.toString());
+            
+            if (expanded) {
+                control.classList.add('expanded');
+                this.expandedNodes.add(nodeId);
+            } else {
+                control.classList.remove('expanded');
+                this.expandedNodes.delete(nodeId);
+            }
+        }
+
+        /**
+         * Handle expansion toggle
+         * @param {string} nodeId - Node ID to toggle
+         */
+        handleExpansionToggle(nodeId) {
+            const isExpanded = this.expandedNodes.has(nodeId);
+            
+            if (isExpanded) {
+                this.animateCollapse(nodeId);
+            } else {
+                this.animateExpansion(nodeId);
+            }
+
+            // Use node interactions if available
+            if (this.nodeInteractions) {
+                this.nodeInteractions.toggleNodeExpansion(nodeId);
+            }
+        }
+
+        /**
+         * Animate node expansion
+         * @param {string} nodeId - Node ID
+         * @param {number} duration - Animation duration override
+         */
+        animateExpansion(nodeId, duration = null) {
+            const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`);
+            const contentElement = nodeElement?.querySelector('.expandable-content');
+            
+            if (!nodeElement || !contentElement) return;
+
+            const animDuration = duration || this.animationConfig.expansionDuration;
+            
+            // Respect reduced motion preference
+            if (this.animationConfig.respectReducedMotion && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                contentElement.classList.remove('collapsed');
+                contentElement.classList.add('expanded');
+                this.updateControlState(nodeId, true);
+                return;
+            }
+
+            // Set CSS custom properties for animation
+            contentElement.style.setProperty('--expansion-duration', `${animDuration}ms`);
+            contentElement.style.setProperty('--expansion-easing', this.animationConfig.expansionEasing);
+
+            // Start animation
+            contentElement.classList.remove('collapsed');
+            
+            // Use requestAnimationFrame for smooth animation
+            requestAnimationFrame(() => {
+                contentElement.classList.add('expanded');
+                this.updateControlState(nodeId, true);
+                
+                // Announce to screen readers
+                announceToScreenReader(`Node expanded: ${nodeElement.textContent?.trim()}`);
+                
+                // Emit completion event
+                if (this.eventBus) {
+                    setTimeout(() => {
+                        this.eventBus.emit('expansion:animation:complete', {
+                            nodeId,
+                            type: 'expand',
+                            duration: animDuration
+                        });
+                    }, animDuration);
+                }
+            });
+        }
+
+        /**
+         * Animate node collapse
+         * @param {string} nodeId - Node ID
+         * @param {number} duration - Animation duration override
+         */
+        animateCollapse(nodeId, duration = null) {
+            const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`);
+            const contentElement = nodeElement?.querySelector('.expandable-content');
+            
+            if (!nodeElement || !contentElement) return;
+
+            const animDuration = duration || this.animationConfig.collapseDuration;
+            
+            // Respect reduced motion preference
+            if (this.animationConfig.respectReducedMotion && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                contentElement.classList.remove('expanded');
+                contentElement.classList.add('collapsed');
+                this.updateControlState(nodeId, false);
+                return;
+            }
+
+            // Set CSS custom properties for animation
+            contentElement.style.setProperty('--expansion-duration', `${animDuration}ms`);
+            contentElement.style.setProperty('--expansion-easing', this.animationConfig.collapseEasing);
+
+            // Start animation
+            contentElement.classList.remove('expanded');
+            
+            // Use requestAnimationFrame for smooth animation
+            requestAnimationFrame(() => {
+                contentElement.classList.add('collapsed');
+                this.updateControlState(nodeId, false);
+                
+                // Announce to screen readers
+                announceToScreenReader(`Node collapsed: ${nodeElement.textContent?.trim()}`);
+                
+                // Emit completion event
+                if (this.eventBus) {
+                    setTimeout(() => {
+                        this.eventBus.emit('expansion:animation:complete', {
+                            nodeId,
+                            type: 'collapse',
+                            duration: animDuration
+                        });
+                    }, animDuration);
+                }
+            });
+        }
+
+        /**
+         * Set animation configuration
+         * @param {Object} config - Animation configuration
+         */
+        setAnimationConfig(config) {
+            this.animationConfig = { ...this.animationConfig, ...config };
+        }
+
+        /**
+         * Get expanded nodes
+         * @returns {Array} Array of expanded node IDs
+         */
+        getExpandedNodes() {
+            return Array.from(this.expandedNodes);
+        }
+
+        /**
+         * Check if node is expanded
+         * @param {string} nodeId - Node ID
+         * @returns {boolean} Expansion state
+         */
+        isNodeExpanded(nodeId) {
+            return this.expandedNodes.has(nodeId);
+        }
+
+        /**
+         * Check if node is expandable based on its data
+         * @param {Object} nodeData - Node data
+         * @returns {boolean} Whether node can be expanded
+         */
+        isNodeExpandable(nodeData) {
+            if (!nodeData) return false;
+            
+            // Node is expandable if it has detail content or elements
+            return !!(nodeData.detail || 
+                     nodeData.elements?.length > 0 || 
+                     nodeData.contentType === 'table' ||
+                     nodeData.contentType === 'list' ||
+                     nodeData.contentType === 'code');
+        }
+
+        /**
+         * Ensure expandable content container exists
+         * @param {HTMLElement} nodeElement - Node element
+         * @param {Object} nodeData - Node data
+         */
+        ensureExpandableContent(nodeElement, nodeData) {
+            let contentContainer = nodeElement.querySelector('.expandable-content');
+            
+            if (!contentContainer) {
+                contentContainer = document.createElement('div');
+                contentContainer.className = 'expandable-content collapsed';
+                
+                // Add expandable content based on node data
+                this.populateExpandableContent(contentContainer, nodeData);
+                
+                nodeElement.appendChild(contentContainer);
+            }
+        }
+
+        /**
+         * Populate expandable content based on node data
+         * @param {HTMLElement} container - Content container
+         * @param {Object} nodeData - Node data
+         */
+        populateExpandableContent(container, nodeData) {
+            if (!nodeData) return;
+
+            // Clear existing content
+            container.innerHTML = '';
+
+            // Add detail content if available
+            if (nodeData.detail) {
+                const detailElement = document.createElement('div');
+                detailElement.className = 'detail-content text-sm text-gray-600 dark:text-gray-400 mt-2';
+                detailElement.textContent = nodeData.detail;
+                container.appendChild(detailElement);
+            }
+
+            // Add elements if available
+            if (nodeData.elements?.length > 0) {
+                const elementsContainer = document.createElement('div');
+                elementsContainer.className = 'elements-content mt-2';
+                
+                nodeData.elements.forEach(element => {
+                    const elementDiv = document.createElement('div');
+                    elementDiv.className = 'element-item text-xs text-gray-500 dark:text-gray-500 mb-1';
+                    elementDiv.textContent = element;
+                    elementsContainer.appendChild(elementDiv);
+                });
+                
+                container.appendChild(elementsContainer);
+            }
+
+            // Add content type specific rendering
+            if (nodeData.contentType && nodeData.contentType !== 'text') {
+                const typeIndicator = document.createElement('div');
+                typeIndicator.className = 'content-type-indicator text-xs font-medium text-blue-600 dark:text-blue-400 mt-1';
+                typeIndicator.textContent = `Type: ${nodeData.contentType}`;
+                container.appendChild(typeIndicator);
+            }
+        }
+
+        /**
+         * Handle node click events
+         * @param {Object} eventData - Event data from T019
+         */
+        handleNodeClick(eventData) {
+            // Add expansion control if node becomes expandable
+            const nodeElement = eventData.element;
+            const nodeData = eventData.nodeData;
+            
+            if (this.isNodeExpandable(nodeData)) {
+                this.addExpansionControl(nodeElement, nodeData);
+            }
+        }
+
+        /**
+         * Handle node double-click events
+         * @param {Object} eventData - Event data from T019
+         */
+        handleNodeDoubleClick(eventData) {
+            // Double-click toggles expansion
+            if (this.isNodeExpandable(eventData.nodeData)) {
+                this.handleExpansionToggle(eventData.nodeId);
+            }
+        }
+
+        /**
+         * Handle node expanded events
+         * @param {Object} eventData - Event data from T019
+         */
+        handleNodeExpanded(eventData) {
+            this.animateExpansion(eventData.nodeId);
+        }
+
+        /**
+         * Handle node collapsed events
+         * @param {Object} eventData - Event data from T019
+         */
+        handleNodeCollapsed(eventData) {
+            this.animateCollapse(eventData.nodeId);
+        }
+    }
+
+    // Create global expansion control manager instance
+    let expansionControlManager = null;
+
+    /**
+     * Initialize expansion controls
+     */
+    function initializeExpansionControls() {
+        if (!expansionControlManager) {
+            expansionControlManager = new ExpansionControlManager();
+        }
+        return expansionControlManager;
+    }
+
     // Public API
     return {
         init,
@@ -661,7 +1176,9 @@ window.MarkdownMindmap.UIComponents = (function() {
         updateMetrics,
         showLoading,
         hideLoading,
-        announceToScreenReader
+        announceToScreenReader,
+        initializeExpansionControls,
+        get expansionControls() { return expansionControlManager; }
     };
 
 })();

@@ -1162,3 +1162,368 @@
     min-height: 400px;
   }
 }
+/* ======================
+   CODE BLOCK DISPLAY COMPONENT
+   ====================== */
+
+.mindmap-code-block {
+  position: relative;
+  margin: 0.5rem 0;
+  background-color: var(--color-surface-dark, #2d2d2d);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border-dark, #444);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.mindmap-code-block pre {
+  margin: 0;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.mindmap-code-block.with-line-numbers pre {
+  margin-left: 3.5rem;
+  border-left: 1px solid var(--color-border-dark, #444);
+}
+
+.mindmap-code-block code {
+  font-family: var(--font-mono);
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  tab-size: 4;
+  hyphens: none;
+  direction: ltr;
+  color: var(--color-text-light, #f8f8f2);
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background-color: var(--color-surface-darker, #1e1e1e);
+  border-bottom: 1px solid var(--color-border-dark, #444);
+  color: var(--color-text-light, #f8f8f2);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.language-indicator {
+  opacity: 0.8;
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.05em;
+}
+
+.line-numbers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 1rem 0.5rem;
+  width: 3rem;
+  background-color: var(--color-surface-darker, #1e1e1e);
+  border-right: 1px solid var(--color-border-dark, #444);
+  text-align: right;
+  color: var(--color-text-muted, #999);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  user-select: none;
+}
+
+.line-number {
+  display: block;
+}
+
+.copy-button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: var(--color-surface-dark, #333);
+  border: 1px solid var(--color-border, #555);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-text-light, #f8f8f2);
+  font-size: var(--font-size-xs);
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.copy-button:hover, .copy-button:focus {
+  background-color: var(--color-surface, #444);
+}
+
+.copy-button.copied {
+  background-color: var(--color-success, #2a9d8f);
+  border-color: var(--color-success-dark, #237167);
+}
+
+.copy-button.copy-failed {
+  background-color: var(--color-error, #e63946);
+  border-color: var(--color-error-dark, #c32232);
+}
+
+.truncation-indicator {
+  padding: 0.5rem 1rem;
+  background-color: var(--color-surface-darker, #1e1e1e);
+  border-top: 1px solid var(--color-border-dark, #444);
+  color: var(--color-text-muted, #999);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+/* Syntax highlighting token colors */
+.mindmap-code-block .token.keyword {
+  color: var(--color-syntax-keyword, #ff79c6);
+}
+
+.mindmap-code-block .token.string {
+  color: var(--color-syntax-string, #f1fa8c);
+}
+
+.mindmap-code-block .token.comment {
+  color: var(--color-syntax-comment, #6272a4);
+  font-style: italic;
+}
+
+.mindmap-code-block .token.number {
+  color: var(--color-syntax-number, #bd93f9);
+}
+
+.mindmap-code-block .token.boolean {
+  color: var(--color-syntax-boolean, #bd93f9);
+}
+
+.mindmap-code-block .token.function {
+  color: var(--color-syntax-function, #50fa7b);
+}
+
+.mindmap-code-block .token.property {
+  color: var(--color-syntax-property, #8be9fd);
+}
+
+.mindmap-code-block .token.tag {
+  color: var(--color-syntax-tag, #ff79c6);
+}
+
+.mindmap-code-block .token.attr-name {
+  color: var(--color-syntax-attr, #50fa7b);
+}
+
+.mindmap-code-block .token.attr-value {
+  color: var(--color-syntax-string, #f1fa8c);
+}
+
+.mindmap-code-block .token.selector {
+  color: var(--color-syntax-selector, #ff79c6);
+}
+
+.mindmap-code-block .token.unit {
+  color: var(--color-syntax-unit, #ffb86c);
+}
+
+.mindmap-code-block .token.color {
+  color: var(--color-syntax-value, #ffb86c);
+}
+
+.mindmap-code-block .token.header {
+  color: var(--color-syntax-keyword, #ff79c6);
+  font-weight: bold;
+}
+
+.mindmap-code-block .token.bold {
+  font-weight: bold;
+}
+
+.mindmap-code-block .token.italic {
+  font-style: italic;
+}
+
+.mindmap-code-block .token.url, .mindmap-code-block .token.link {
+  color: var(--color-syntax-link, #8be9fd);
+  text-decoration: underline;
+}
+
+/* Theme Integration */
+.mindmap-code-block.theme-light {
+  background-color: var(--color-surface-light, #f8f9fa);
+  border-color: var(--color-border-light, #e9ecef);
+}
+
+.mindmap-code-block.theme-light .code-header {
+  background-color: var(--color-surface, #edf2f7);
+  border-color: var(--color-border-light, #e9ecef);
+  color: var(--color-text-dark, #1a202c);
+}
+
+.mindmap-code-block.theme-light .line-numbers {
+  background-color: var(--color-surface, #edf2f7);
+  border-color: var(--color-border-light, #e9ecef);
+  color: var(--color-text-muted-light, #718096);
+}
+
+.mindmap-code-block.theme-light code {
+  color: var(--color-text-dark, #1a202c);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .mindmap-code-block.with-line-numbers pre {
+    margin-left: 2.5rem;
+  }
+
+  .line-numbers {
+    width: 2rem;
+    padding: 1rem 0.25rem;
+  }
+  
+  .copy-button {
+    padding: 0.15rem 0.35rem;
+  }
+  
+  .copy-button .copy-icon + span {
+    display: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .mindmap-code-block {
+    break-inside: avoid;
+    border: 1px solid #000;
+    background: none !important;
+  }
+  
+  .mindmap-code-block pre, 
+  .mindmap-code-block code {
+    white-space: pre-wrap;
+    color: #000 !important;
+  }
+  
+  .code-header {
+    border-bottom: 1px solid #000;
+    background: none !important;
+  }
+  
+  .line-numbers {
+    border-right: 1px solid #000;
+    background: none !important;
+  }
+  
+  .copy-button {
+    display: none;
+  }
+  
+  .mindmap-code-block .token {
+    color: #000 !important;
+  }
+}
+
+/* ======================
+   ENHANCED NODE TYPES (T016)
+   ====================== */
+
+/* Multi-node type SVG styling */
+.mindmap-node-text {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.mindmap-node-table {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.mindmap-node-table:hover {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2)) brightness(1.1);
+}
+
+.mindmap-node-code {
+  filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.3));
+}
+
+.mindmap-node-code:hover {
+  filter: drop-shadow(0 4px 8px rgba(16, 185, 129, 0.4)) brightness(1.1);
+}
+
+.mindmap-node-list {
+  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3));
+}
+
+.mindmap-node-list:hover {
+  filter: drop-shadow(0 4px 8px rgba(245, 158, 11, 0.4)) brightness(1.1);
+}
+
+/* Node content indicators */
+.node-icon {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+.table-indicator,
+.code-indicator,
+.list-indicator {
+  font-family: system-ui, sans-serif;
+  font-weight: 500;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Enhanced tooltips for different node types */
+.mindmap-tooltip {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  line-height: 1.4;
+}
+
+/* Node type animations */
+@keyframes nodeTypeGlow {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.2); }
+  100% { filter: brightness(1); }
+}
+
+.mindmap-node-table.active,
+.mindmap-node-code.active,
+.mindmap-node-list.active {
+  animation: nodeTypeGlow 1s ease-in-out;
+}
+
+/* Accessibility enhancements for node shapes */
+@media (prefers-reduced-motion: reduce) {
+  .mindmap-node-text,
+  .mindmap-node-table, 
+  .mindmap-node-code,
+  .mindmap-node-list {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mindmap-node-table {
+    stroke: #000 !important;
+    stroke-width: 3px !important;
+  }
+  
+  .mindmap-node-code {
+    stroke: #000 !important;
+    stroke-width: 3px !important;
+  }
+  
+  .mindmap-node-list {
+    stroke: #000 !important;
+    stroke-width: 3px !important;
+  }
+  
+  .table-indicator,
+  .code-indicator,
+  .list-indicator {
+    fill: #000 !important;
+    color: #000 !important;
+  }
+}

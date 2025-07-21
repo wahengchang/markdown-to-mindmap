@@ -12,11 +12,13 @@
      */
     class TreeNode {
         /**
-         * Create a new TreeNode
+         * Create a new TreeNode with enhanced content support
          * @param {string} text - The text content of the node
          * @param {number} level - The depth level in the tree (default: 0)
+         * @param {string} contentType - Content classification (default: 'text')
+         * @param {Array} elements - Structured content elements (default: [])
          */
-        constructor(text, level = 0) {
+        constructor(text, level = 0, contentType = 'text', elements = []) {
             this.text = text;              // Title/heading for display
             this.detail = '';              // Detailed content for leaf nodes
             this.level = level;
@@ -28,7 +30,9 @@
             this.y = 0;
             
             // Node properties
-            this.type = 'text'; // Default type: text, code, list, etc.
+            this.type = 'text'; // Default type: text, code, list, etc. (legacy)
+            this.contentType = contentType; // Enhanced content classification
+            this.elements = elements || []; // Structured content elements
             this.id = TreeNode.generateId();
             this.collapsed = false;
             this.metadata = {};
@@ -80,6 +84,133 @@
                 results = results.concat(child.findByType(type));
             }
             return results;
+        }
+
+        /**
+         * Set content type and elements for this node
+         * @param {string} contentType - Content type classification
+         * @param {Array} elements - Structured content elements
+         */
+        setContentData(contentType, elements) {
+            this.contentType = contentType;
+            this.elements = elements || [];
+            // Update legacy type for backward compatibility
+            this.type = contentType;
+        }
+
+        /**
+         * Check if node has expandable content
+         * @returns {boolean} True if node contains complex content that can be expanded
+         */
+        hasExpandableContent() {
+            return this.elements && this.elements.length > 0 && 
+                   ['table', 'list', 'complex', 'code', 'math'].includes(this.contentType);
+        }
+
+        /**
+         * Get all nodes with specific content type in subtree
+         * @param {string} contentType - Content type to search for
+         * @returns {TreeNode[]} Array of matching nodes
+         */
+        findByContentType(contentType) {
+            let results = [];
+            if (this.contentType === contentType) {
+                results.push(this);
+            }
+            for (let child of this.children) {
+                results = results.concat(child.findByContentType(contentType));
+            }
+            return results;
+        }
+
+        /**
+         * Expand complex content into child nodes
+         * @returns {TreeNode[]} Array of new child nodes created from elements
+         */
+        expandContent() {
+            const newNodes = [];
+            
+            if (!this.hasExpandableContent()) {
+                return newNodes;
+            }
+
+            for (let element of this.elements) {
+                let childNode;
+                
+                switch (element.type) {
+                    case 'cell':
+                        childNode = new TreeNode(
+                            element.content, 
+                            this.level + 1, 
+                            'text', 
+                            []
+                        );
+                        break;
+                        
+                    case 'list-item':
+                        childNode = new TreeNode(
+                            element.content, 
+                            this.level + 1, 
+                            'list-item', 
+                            []
+                        );
+                        break;
+                        
+                    case 'code-block':
+                        childNode = new TreeNode(
+                            `Code: ${element.language || 'text'}`, 
+                            this.level + 1, 
+                            'code', 
+                            [element]
+                        );
+                        childNode.content = element.content;
+                        childNode.language = element.language;
+                        break;
+                        
+                    case 'image':
+                        childNode = new TreeNode(
+                            `Image: ${element.alt}`, 
+                            this.level + 1, 
+                            'image', 
+                            [element]
+                        );
+                        break;
+                        
+                    case 'link':
+                        childNode = new TreeNode(
+                            element.text, 
+                            this.level + 1, 
+                            'link', 
+                            [element]
+                        );
+                        break;
+                        
+                    case 'formula':
+                        childNode = new TreeNode(
+                            `Math: ${element.content}`, 
+                            this.level + 1, 
+                            'math', 
+                            [element]
+                        );
+                        childNode.formula = element.content;
+                        break;
+                        
+                    default:
+                        childNode = new TreeNode(
+                            element.content || 'Unknown Element', 
+                            this.level + 1, 
+                            'text', 
+                            []
+                        );
+                }
+                
+                if (childNode) {
+                    this.addChild(childNode);
+                    newNodes.push(childNode);
+                }
+            }
+            
+            return newNodes;
         }
 
         /**
@@ -146,7 +277,9 @@
                 text: this.text,
                 detail: this.detail,
                 level: this.level,
-                type: this.type,
+                type: this.type, // Legacy field
+                contentType: this.contentType,
+                elements: this.elements,
                 collapsed: this.collapsed,
                 metadata: this.metadata,
                 children: this.children.map(child => child.toJSON())
@@ -163,10 +296,16 @@
                 throw new Error('Invalid JSON data for TreeNode deserialization');
             }
 
-            const node = new TreeNode(json.text || '', json.level || 0);
+            const node = new TreeNode(
+                json.text || '', 
+                json.level || 0,
+                json.contentType || json.type || 'text', // Support both new and legacy
+                json.elements || []
+            );
+            
             node.id = json.id || TreeNode.generateId();
             node.detail = json.detail || '';
-            node.type = json.type || 'text';
+            node.type = json.type || json.contentType || 'text'; // Legacy support
             node.collapsed = json.collapsed || false;
             node.metadata = json.metadata || {};
             

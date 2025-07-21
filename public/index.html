@@ -11,6 +11,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- d3.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <!-- Modular JavaScript Files -->
     <script src="js/utils/helpers.js"></script>
@@ -21,9 +23,15 @@
     <script src="js/rendering/d3-renderer.js"></script>
     <script src="js/rendering/svg-exporter.js"></script>
     <script src="js/events/event-manager.js"></script>
+    <script src="js/events/node-interactions.js"></script>
+    <script src="js/rendering/d3-animations.js"></script>
     <script src="js/ui/components.js"></script>
     <script src="js/ui/theme-manager.js"></script>
     <script src="js/ui/theme-selector.js"></script>
+    <script src="js/ui/code-block-display.js"></script>
+    <script src="js/ui/table-renderer.js"></script>
+    <script src="js/ui/tooltip-manager.js"></script>
+    <script src="js/ui/export-manager.js"></script>
     <script src="js/core/main.js"></script>
     <script>
         tailwind.config = {
@@ -35,6 +43,15 @@
     </script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans">
+    <!-- Immediate Dark Mode Script (no waiting for DOMContentLoaded) -->
+    <script>
+        (function() {
+            // Apply dark mode from localStorage immediately to avoid flash of wrong theme
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <!-- Top Navigation -->
@@ -147,20 +164,45 @@
                     <span id="statusMessage">Ready</span>
                 </div>
                 
-                <div class="flex items-center space-x-3">
-                    <button id="downloadHtmlBtn" class="download-btn flex items-center px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors" aria-label="Download as HTML">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Download HTML
-                    </button>
-                    
-                    <button id="downloadSvgBtn" class="download-btn flex items-center px-3 py-1 text-xs text-white bg-green-600 hover:bg-green-700 rounded transition-colors" aria-label="Download as SVG">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                        </svg>
-                        Download SVG
-                    </button>
+                <div class="flex items-center space-x-2">
+                    <div class="relative">
+                        <button id="exportMenuBtn" class="export-menu-btn flex items-center px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors" aria-label="Export mindmap">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Export
+                            <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        
+                        <!-- Export dropdown menu -->
+                        <div id="exportMenu" class="export-menu absolute bottom-full right-0 mb-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg hidden z-50">
+                            <div class="p-1">
+                                <button class="export-option w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center" data-format="svg">
+                                    <span class="w-2 h-2 bg-green-500 rounded mr-2"></span>
+                                    SVG Vector
+                                </button>
+                                <button class="export-option w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center" data-format="png">
+                                    <span class="w-2 h-2 bg-blue-500 rounded mr-2"></span>
+                                    PNG Image
+                                </button>
+                                <button class="export-option w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center" data-format="pdf">
+                                    <span class="w-2 h-2 bg-red-500 rounded mr-2"></span>
+                                    PDF Document
+                                </button>
+                                <button class="export-option w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center" data-format="html">
+                                    <span class="w-2 h-2 bg-orange-500 rounded mr-2"></span>
+                                    HTML Page
+                                </button>
+                                <hr class="my-1 border-gray-200 dark:border-gray-600">
+                                <button id="bulkExportBtn" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center">
+                                    <span class="w-2 h-2 bg-purple-500 rounded mr-2"></span>
+                                    Export All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -168,6 +210,50 @@
     
     <!-- Toast Notifications -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Standalone Dark Mode Toggle Script -->
+    <script>
+        // Wait for the DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Use a direct approach to get the button
+            var toggleBtn = document.getElementById('darkModeToggle');
+            
+            if (toggleBtn) {
+                // Add click event directly to the button
+                toggleBtn.onclick = function() {
+                    // Toggle dark mode class
+                    document.documentElement.classList.toggle('dark');
+                    
+                    // Save preference
+                    var isDarkMode = document.documentElement.classList.contains('dark');
+                    localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
+                    
+                    // Visual feedback
+                    if (isDarkMode) {
+                        toggleBtn.setAttribute('aria-pressed', 'true');
+                    } else {
+                        toggleBtn.setAttribute('aria-pressed', 'false');
+                    }
+                };
+                
+                // Set initial aria-pressed state based on current theme
+                var currentIsDark = document.documentElement.classList.contains('dark');
+                toggleBtn.setAttribute('aria-pressed', currentIsDark ? 'true' : 'false');
+            }
+        });
+        
+        // Also add a direct event listener when the script runs (belt and suspenders approach)
+        (function() {
+            var toggleBtn = document.getElementById('darkModeToggle');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    document.documentElement.classList.toggle('dark');
+                    var isDarkMode = document.documentElement.classList.contains('dark');
+                    localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
+                });
+            }
+        })();
+    </script>
 
     <!-- Theme Selector Initialization -->
     <script>
@@ -188,9 +274,52 @@
                         }
                     },
                     onSelect: function(themeId) {
+                        console.log('%c[1] ThemeSelector → ThemeManager.switchTheme(' + themeId + ')', 'background:#ff9900;color:black;padding:3px;font-weight:bold');
+                        
                         // For permanently selecting a theme
                         if (window.MarkdownMindmap?.ThemeManager) {
                             window.MarkdownMindmap.ThemeManager.switchTheme(themeId);
+                            
+                            // Force mindmap redraw directly after theme change
+                            setTimeout(function() {
+                                const markdownInput = document.getElementById('markdownInput');
+                                const container = document.getElementById('mindmapContainer');
+                                
+                                if (markdownInput && container && window.MarkdownMindmap?.Renderer) {
+                                    console.log('%c[3] onSelect handler → Directly triggering mindmap redraw', 'background:#00cc66;color:black;padding:3px;font-weight:bold');
+                                    console.log('  Markdown content length:', markdownInput.value.length);
+                                    console.log('  Container found:', container.id);
+                                    
+                                    // Clean the container completely
+                                    container.innerHTML = '';
+                                    console.log('  Container cleared');
+                                    
+                                    // Force a complete reparse and redraw
+                                    window.MarkdownMindmap.Renderer.updateMindmapFromMarkdown(
+                                        markdownInput.value, 
+                                        container
+                                    );
+                                    
+                                    // Verify the mindmap was drawn
+                                    setTimeout(function() {
+                                        const nodes = container.querySelectorAll('.mindmap-node');
+                                        console.log('  Nodes created after redraw:', nodes.length);
+                                        
+                                        if (nodes.length > 0) {
+                                            const firstNode = nodes[0].querySelector('circle');
+                                            if (firstNode) {
+                                                console.log('  First node color:', window.getComputedStyle(firstNode).fill);
+                                            }
+                                        }
+                                    }, 100);
+                                } else {
+                                    console.error('  Cannot redraw - missing required objects:', {
+                                        markdownInput: !!markdownInput,
+                                        container: !!container,
+                                        renderer: !!window.MarkdownMindmap?.Renderer
+                                    });
+                                }
+                            }, 200); // Slightly longer delay to ensure theme is applied
                         }
                     }
                 });
@@ -198,17 +327,83 @@
             
             // Dark mode toggle functionality
             const darkModeToggle = document.getElementById('darkModeToggle');
+            console.log('Dark mode toggle element:', darkModeToggle);
+            
             if (darkModeToggle) {
+                console.log('Initial dark mode state:', document.documentElement.classList.contains('dark'));
+                
                 darkModeToggle.addEventListener('click', function() {
+                    console.log('Dark mode toggle clicked');
                     document.documentElement.classList.toggle('dark');
                     const isDark = document.documentElement.classList.contains('dark');
+                    console.log('Dark mode toggled to:', isDark);
                     localStorage.setItem('darkMode', isDark ? 'true' : 'false');
                 });
                 
                 // Check for saved dark mode preference
                 const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+                console.log('Saved dark mode preference:', savedDarkMode);
+                
                 if (savedDarkMode) {
                     document.documentElement.classList.add('dark');
+                    console.log('Applied dark mode class from saved preference');
+                }
+            } else {
+                console.error('Dark mode toggle button not found in the DOM!');
+            }
+            
+            // Export menu functionality
+            const exportMenuBtn = document.getElementById('exportMenuBtn');
+            const exportMenu = document.getElementById('exportMenu');
+            const exportOptions = document.querySelectorAll('.export-option');
+            const bulkExportBtn = document.getElementById('bulkExportBtn');
+            
+            if (exportMenuBtn && exportMenu) {
+                // Toggle export menu
+                exportMenuBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    exportMenu.classList.toggle('hidden');
+                });
+                
+                // Close menu when clicking outside
+                document.addEventListener('click', function() {
+                    exportMenu.classList.add('hidden');
+                });
+                
+                exportMenu.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+                
+                // Handle individual export options
+                exportOptions.forEach(option => {
+                    option.addEventListener('click', function() {
+                        const format = this.getAttribute('data-format');
+                        if (window.TreeInteraction?.ExportManager) {
+                            window.TreeInteraction.ExportManager.exportMindmap(format);
+                        } else if (window.MarkdownMindmap?.SVGExporter) {
+                            // Fallback to basic SVG/HTML export
+                            const svgElement = document.querySelector('#mindmapContainer svg');
+                            if (svgElement) {
+                                if (format === 'svg') {
+                                    window.MarkdownMindmap.SVGExporter.exportAsSVG(svgElement);
+                                } else if (format === 'html') {
+                                    window.MarkdownMindmap.SVGExporter.exportAsHTML(svgElement);
+                                }
+                            }
+                        }
+                        exportMenu.classList.add('hidden');
+                    });
+                });
+                
+                // Handle bulk export
+                if (bulkExportBtn) {
+                    bulkExportBtn.addEventListener('click', function() {
+                        if (window.TreeInteraction?.ExportManager) {
+                            const supportedFormats = window.TreeInteraction.ExportManager.getSupportedFormats();
+                            window.TreeInteraction.ExportManager.bulkExport(supportedFormats);
+                        }
+                        exportMenu.classList.add('hidden');
+                    });
                 }
             }
         });

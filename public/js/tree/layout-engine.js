@@ -24,6 +24,18 @@
         defaultViewport: {
             width: 1200,
             height: 800
+        },
+        // Collision detection configuration
+        collision: {
+            enabled: true,
+            nodeMargin: 15,
+            maxIterations: 50,
+            spatialGridSize: 100,
+            forceStrength: 0.1,
+            convergenceThreshold: 1.0,
+            preserveHierarchy: true,
+            adaptiveSpacing: true,
+            nodeRadius: 25 // Default node radius for collision calculations
         }
     };
 
@@ -237,12 +249,259 @@
         return count;
     }
 
+    /**
+     * Collision Detection Functions
+     */
+
+    /**
+     * Detect collision between two nodes
+     * @param {TreeNode} node1 - First node
+     * @param {TreeNode} node2 - Second node
+     * @param {number} margin - Minimum distance between nodes
+     * @returns {boolean} True if nodes are colliding
+     */
+    function detectCollision(node1, node2, margin = LayoutConfig.collision.nodeMargin) {
+        if (!node1 || !node2 || node1 === node2) return false;
+        
+        const dx = node1.x - node2.x;
+        const dy = node1.y - node2.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const minDistance = (LayoutConfig.collision.nodeRadius * 2) + margin;
+        
+        return distance < minDistance;
+    }
+
+    /**
+     * Create spatial grid for efficient collision detection
+     * @param {Object} viewport - Viewport dimensions {width, height}
+     * @param {number} cellSize - Size of each grid cell
+     * @returns {Object} Spatial grid structure
+     */
+    function createSpatialGrid(viewport, cellSize = LayoutConfig.collision.spatialGridSize) {
+        const grid = {
+            cellSize,
+            cols: Math.ceil(viewport.width / cellSize),
+            rows: Math.ceil(viewport.height / cellSize),
+            cells: new Map()
+        };
+        
+        return grid;
+    }
+
+    /**
+     * Add node to spatial grid
+     * @param {Object} grid - Spatial grid
+     * @param {TreeNode} node - Node to add
+     */
+    function addToGrid(grid, node) {
+        const col = Math.floor(node.x / grid.cellSize);
+        const row = Math.floor(node.y / grid.cellSize);
+        const key = `${col},${row}`;
+        
+        if (!grid.cells.has(key)) {
+            grid.cells.set(key, []);
+        }
+        grid.cells.get(key).push(node);
+    }
+
+    /**
+     * Get nearby nodes from spatial grid
+     * @param {Object} grid - Spatial grid
+     * @param {TreeNode} node - Reference node
+     * @returns {TreeNode[]} Nearby nodes
+     */
+    function getNearbyNodes(grid, node) {
+        const nearby = [];
+        const col = Math.floor(node.x / grid.cellSize);
+        const row = Math.floor(node.y / grid.cellSize);
+        
+        // Check 3x3 grid around the node
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                const checkCol = col + i;
+                const checkRow = row + j;
+                const key = `${checkCol},${checkRow}`;
+                
+                if (grid.cells.has(key)) {
+                    nearby.push(...grid.cells.get(key));
+                }
+            }
+        }
+        
+        return nearby.filter(n => n !== node);
+    }
+
+    /**
+     * Find all colliding node pairs
+     * @param {TreeNode[]} nodes - Array of all nodes
+     * @param {Object} viewport - Viewport dimensions
+     * @returns {Array} Array of colliding node pairs
+     */
+    function findCollisions(nodes, viewport) {
+        const collisions = [];
+        const grid = createSpatialGrid(viewport);
+        
+        // Populate spatial grid
+        nodes.forEach(node => addToGrid(grid, node));
+        
+        // Check for collisions using spatial optimization
+        nodes.forEach(node => {
+            const nearby = getNearbyNodes(grid, node);
+            nearby.forEach(other => {
+                if (detectCollision(node, other) && !collisions.some(pair => 
+                    (pair[0] === node && pair[1] === other) || 
+                    (pair[0] === other && pair[1] === node))) {
+                    collisions.push([node, other]);
+                }
+            });
+        });
+        
+        return collisions;
+    }
+
+    /**
+     * Resolve overlapping nodes using force-based adjustment
+     * @param {Array} collisionPairs - Array of colliding node pairs
+     * @param {number} iterations - Number of adjustment iterations
+     * @returns {Object} Resolution statistics
+     */
+    function resolveOverlaps(collisionPairs, iterations = LayoutConfig.collision.maxIterations) {
+        const startTime = performance.now();
+        let resolved = 0;
+        
+        for (let iter = 0; iter < iterations; iter++) {
+            let adjustmentMade = false;
+            let maxAdjustment = 0;
+            
+            collisionPairs.forEach(([node1, node2]) => {
+                if (!detectCollision(node1, node2)) return;
+                
+                const dx = node1.x - node2.x;
+                const dy = node1.y - node2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance === 0) {
+                    // Handle exact overlap with small random offset
+                    const angle = Math.random() * 2 * Math.PI;
+                    const offset = LayoutConfig.collision.nodeRadius + LayoutConfig.collision.nodeMargin;
+                    node1.x += Math.cos(angle) * offset * 0.5;
+                    node1.y += Math.sin(angle) * offset * 0.5;
+                    node2.x -= Math.cos(angle) * offset * 0.5;
+                    node2.y -= Math.sin(angle) * offset * 0.5;
+                    adjustmentMade = true;
+                    return;
+                }
+                
+                const minDistance = (LayoutConfig.collision.nodeRadius * 2) + LayoutConfig.collision.nodeMargin;
+                const overlap = minDistance - distance;
+                
+                if (overlap > 0) {
+                    // Calculate unit vector
+                    const ux = dx / distance;
+                    const uy = dy / distance;
+                    
+                    // Apply force-based adjustment
+                    const force = overlap * LayoutConfig.collision.forceStrength;
+                    const adjustment = force * 0.5; // Split adjustment between both nodes
+                    
+                    node1.x += ux * adjustment;
+                    node1.y += uy * adjustment;
+                    node2.x -= ux * adjustment;
+                    node2.y -= uy * adjustment;
+                    
+                    maxAdjustment = Math.max(maxAdjustment, adjustment);
+                    adjustmentMade = true;
+                }
+            });
+            
+            // Check convergence
+            if (!adjustmentMade || maxAdjustment < LayoutConfig.collision.convergenceThreshold) {
+                resolved = iter + 1;
+                break;
+            }
+        }
+        
+        const endTime = performance.now();
+        return {
+            iterations: resolved,
+            executionTime: endTime - startTime,
+            converged: resolved < iterations
+        };
+    }
+
+    /**
+     * Calculate layout with collision detection and resolution
+     * @param {TreeNode} root - Root node of the tree
+     * @param {number} centerX - Center X coordinate
+     * @param {number} centerY - Center Y coordinate
+     * @param {Object} viewport - Viewport dimensions
+     * @param {Object} options - Layout options
+     * @returns {Object} Enhanced layout statistics
+     */
+    function calculateLayoutWithCollisionDetection(root, centerX = 600, centerY = 400, viewport = null, options = {}) {
+        const startTime = performance.now();
+        
+        // First, calculate basic layout
+        const basicStats = calculateLayout(root, centerX, centerY, viewport);
+        
+        // Skip collision detection if disabled
+        if (!LayoutConfig.collision.enabled || !options.enableCollisionDetection) {
+            return { ...basicStats, collisionDetection: { enabled: false } };
+        }
+        
+        // Collect all nodes for collision detection
+        const allNodes = [];
+        function collectNodes(node) {
+            allNodes.push(node);
+            if (node.children) {
+                node.children.forEach(child => collectNodes(child));
+            }
+        }
+        collectNodes(root);
+        
+        // Find and resolve collisions
+        const viewportBounds = viewport || LayoutConfig.defaultViewport;
+        const collisions = findCollisions(allNodes, viewportBounds);
+        
+        let resolutionStats = { iterations: 0, executionTime: 0, converged: true };
+        if (collisions.length > 0) {
+            resolutionStats = resolveOverlaps(collisions);
+        }
+        
+        const endTime = performance.now();
+        
+        // Enhanced statistics
+        const enhancedStats = {
+            ...basicStats,
+            collisionDetection: {
+                enabled: true,
+                totalCollisions: collisions.length,
+                resolutionIterations: resolutionStats.iterations,
+                resolutionTime: resolutionStats.executionTime,
+                converged: resolutionStats.converged,
+                totalExecutionTime: endTime - startTime
+            }
+        };
+        
+        // Log performance if debug utilities are available
+        if (typeof window !== 'undefined' && window.TreeInteraction?.Utils?.Debug?.log) {
+            window.TreeInteraction.Utils.Debug.log('info', 
+                `Enhanced layout with collision detection completed: ${collisions.length} collisions resolved in ${resolutionStats.iterations} iterations (${(endTime - startTime).toFixed(2)}ms total)`);
+        }
+        
+        return enhancedStats;
+    }
+
     // Expose layout engine to global namespace
     if (typeof window !== 'undefined') {
         window.TreeInteraction = window.TreeInteraction || {};
         window.TreeInteraction.LayoutEngine = {
             calculateLayout,
+            calculateLayoutWithCollisionDetection,
             positionRadially,
+            detectCollision,
+            findCollisions,
+            resolveOverlaps,
             getConfig,
             updateConfig,
             calculateOptimalViewport
@@ -251,7 +510,11 @@
         // Node.js environment support
         module.exports = {
             calculateLayout,
+            calculateLayoutWithCollisionDetection,
             positionRadially,
+            detectCollision,
+            findCollisions,
+            resolveOverlaps,
             getConfig,
             updateConfig,
             calculateOptimalViewport
