@@ -8,8 +8,6 @@
 
     // Import dependencies
     const EventBus = (typeof window !== 'undefined' && window.MindmapEvents) || null;
-    const NodeInteractions = (typeof window !== 'undefined' && window.TreeInteraction?.NodeInteractions) || null;
-    const ExpansionControls = (typeof window !== 'undefined' && window.TreeInteraction?.ExpansionControls) || null;
     const EVENT_TYPES = (typeof window !== 'undefined' && window.TreeInteraction?.EVENT_TYPES) || {};
     const Debug = (typeof window !== 'undefined' && window.TreeInteraction?.Utils?.Debug) || {};
 

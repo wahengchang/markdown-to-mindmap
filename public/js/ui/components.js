@@ -32,6 +32,7 @@ window.MarkdownMindmap.UIComponents = (function() {
         initializeSplitPane();
         initializeCanvasControls();
         initializeStatusBar();
+        initializeThemeToggle();
         initializeNotifications();
         initializeModals();
         initializeExpansionControls();
@@ -225,6 +226,37 @@ window.MarkdownMindmap.UIComponents = (function() {
             // Update theme toggle icon
             updateThemeToggleIcon(newDarkMode);
             
+            // Update ThemeManager to match dark mode state
+            if (window.MarkdownMindmap?.ThemeManager) {
+                // If dark mode is on, switch to the dark theme; otherwise use the saved theme or default to 'professional'
+                const targetTheme = newDarkMode ? 'dark' : (localStorage.getItem('savedTheme') || 'professional');
+                console.log('Switching theme via ThemeManager to:', targetTheme);
+                window.MarkdownMindmap.ThemeManager.switchTheme(targetTheme);
+                
+                // Save the current non-dark theme for later restoration
+                if (!newDarkMode) {
+                    localStorage.setItem('savedTheme', targetTheme);
+                }
+            }
+            
+            // DIRECT UPDATE: Explicitly force mindmap re-render
+            console.log('Directly forcing mindmap re-render');
+            setTimeout(() => {
+                const markdownInput = document.getElementById('markdownInput');
+                const container = document.getElementById('mindmapContainer');
+                if (markdownInput && container && window.MarkdownMindmap?.Renderer) {
+                    // Clear the container
+                    container.innerHTML = '';
+                    
+                    // Force redraw with the current markdown content
+                    window.MarkdownMindmap.Renderer.updateMindmapFromMarkdown(
+                        markdownInput.value, 
+                        container
+                    );
+                    console.log('Mindmap direct re-render completed');
+                }
+            }, 50); // Small delay to ensure DOM is ready
+            
             // Show theme change notification
             showNotification(`Switched to ${newDarkMode ? 'dark' : 'light'} mode`, 'info');
         });
@@ -251,6 +283,9 @@ window.MarkdownMindmap.UIComponents = (function() {
             svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>';
         }
     }
+    
+    // Make updateThemeToggleIcon globally accessible
+    window.updateThemeToggleIcon = updateThemeToggleIcon;
 
     /**
      * Initialize notification system

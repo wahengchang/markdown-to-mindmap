@@ -9,88 +9,23 @@
     'use strict';
 
     // Mock data for testing
-    const mockMarkdown = `# Web Development Roadmap
+    const mockMarkdown = `
+### Blocks
 
-## Frontend Development
-### HTML & CSS
-#### HTML5 Semantic Elements
-#### CSS3 Flexbox & Grid
-#### Responsive Design
-#### CSS Preprocessors
-##### Sass
-##### Less
-##### Stylus
+\`\`\`js
+console.log('hello, JavaScript')
+\`\`\`
 
-### JavaScript
-#### ES6+ Features
-##### Arrow Functions
-##### Promises & Async/Await
-##### Modules
-##### Destructuring
-#### Frontend Frameworks
-##### React
-###### React Hooks
-###### React Router
-###### State Management
-##### Vue.js
-###### Vue 3 Composition API
-###### Vuex
-##### Angular
-###### TypeScript
-###### RxJS
+### Table
+| Products | Price |
+|-|-|
+| Apple | 4 |
+| Banana | 2 |
 
-## Backend Development
-### Node.js
-#### Express.js
-#### RESTful APIs
-#### GraphQL
-#### Authentication
-##### JWT
-##### OAuth
-##### Session Management
-
-### Databases
-#### SQL Databases
-##### PostgreSQL
-##### MySQL
-##### SQLite
-#### NoSQL Databases
-##### MongoDB
-##### Redis
-##### Elasticsearch
-
-## DevOps & Tools
-### Version Control
-#### Git
-##### Branching Strategies
-##### Pull Requests
-##### Git Flow
-
-### CI/CD
-#### GitHub Actions
-#### Jenkins
-#### Docker
-##### Containerization
-##### Docker Compose
-
-### Cloud Platforms
-#### AWS
-##### EC2
-##### S3
-##### RDS
-#### Google Cloud
-#### Azure
-
-## Testing
-### Unit Testing
-#### Jest
-#### Mocha
-#### Chai
-### Integration Testing
-### End-to-End Testing
-#### Cypress
-#### Playwright
-#### Selenium`;
+## Links
+- [Website](https://markmap.js.org/)
+- [GitHub](https://github.com/gera2ld/markmap)
+`;
 
     /**
      * Update mindmap using modular components
@@ -128,36 +63,23 @@
      * Initialize dark mode functionality
      */
     function initializeDarkMode() {
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        if (!darkModeToggle) return;
+        // Initialization has been moved to components.js to avoid conflicts
+        // This function is kept for backwards compatibility
+        console.log('Dark mode initialization delegated to components.js');
         
-        // Check if user has a saved preference
-        const savedPreference = localStorage.getItem('darkMode');
-        
-        // If no saved preference, check system preference
-        if (savedPreference === null) {
-            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            document.documentElement.classList.toggle('dark', prefersDark);
-            localStorage.setItem('darkMode', prefersDark);
-        } else {
-            // Use saved preference
-            const isDark = savedPreference === 'true';
-            document.documentElement.classList.toggle('dark', isDark);
-        }
-
-        // Add listener for dark mode toggle button
-        darkModeToggle.addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-        });
-        
-        // Listen for system preference changes
+        // Listen for system preference changes (this part is still useful)
         if (window.matchMedia) {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
                 // Only update if user hasn't set a preference
                 if (localStorage.getItem('darkMode') === null) {
                     document.documentElement.classList.toggle('dark', e.matches);
                     localStorage.setItem('darkMode', e.matches);
+                    
+                    // Also update ThemeManager if available
+                    if (window.MarkdownMindmap?.ThemeManager) {
+                        const targetTheme = e.matches ? 'dark' : (localStorage.getItem('savedTheme') || 'professional');
+                        window.MarkdownMindmap.ThemeManager.switchTheme(targetTheme);
+                    }
                 }
             });
         }

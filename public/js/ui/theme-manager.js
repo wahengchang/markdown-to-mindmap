@@ -267,6 +267,24 @@
             currentTheme = themeName;
             console.log('  CSS variables updated');
             
+            // Sync dark class with theme
+            const isDarkTheme = themeName === 'dark';
+            if (isDarkTheme && !document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('darkMode', 'true');
+                // Update dark mode toggle icon if function exists
+                if (window.updateThemeToggleIcon) {
+                    window.updateThemeToggleIcon(true);
+                }
+            } else if (!isDarkTheme && document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('darkMode', 'false');
+                // Update dark mode toggle icon if function exists
+                if (window.updateThemeToggleIcon) {
+                    window.updateThemeToggleIcon(false);
+                }
+            }
+            
             // Save preference
             saveThemePreference(themeName);
             

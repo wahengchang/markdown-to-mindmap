@@ -3,6 +3,9 @@
  * Tests for the syntax-highlighted code block display component
  */
 
+// Import the CodeBlockDisplay component
+require('../public/js/ui/code-block-display.js');
+
 describe('CodeBlockDisplay', () => {
   let codeDisplay;
   let testContainer;
