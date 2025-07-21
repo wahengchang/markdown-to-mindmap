@@ -6,8 +6,13 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "dev": "npx serve --no-clipboard -l 5000 ./public",
-    "start": "npx serve --no-clipboard -l 5000 ./public"
+    "dev": "npx serve --no-clipboard -l 5050 ./public",
+    "start": "npx serve --no-clipboard -l 5050 ./public",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "kill:port5050": "lsof -ti:5050 | xargs kill -9 2>/dev/null || true",
+    "e2e": "npm run kill:port5050 && start-server-and-test start http://localhost:5050 cypress:run",
+    "e2e:open": "npm run kill:port5050 && start-server-and-test start http://localhost:5050 cypress:open"
   },
   "repository": {
     "type": "git",
@@ -22,8 +27,12 @@
   "homepage": "https://github.com/wahengchang/markdown-to-mindmap#readme",
   "description": "",
   "devDependencies": {
+    "@testing-library/dom": "^9.3.4",
+    "cypress": "^13.17.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.0.4",
-    "serve": "^14.2.4"
+    "puppeteer": "^22.15.0",
+    "serve": "^14.2.4",
+    "start-server-and-test": "^2.0.3"
   }
 }

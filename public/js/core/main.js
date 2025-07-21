@@ -11,6 +11,7 @@
     // Mock data for testing
     const mockMarkdown = `
 ### Blocks
+Note that if blocks and lists appear at the same level, the lists will be ignored.
 
 \`\`\`js
 console.log('hello, JavaScript')
@@ -22,7 +23,7 @@ console.log('hello, JavaScript')
 | Apple | 4 |
 | Banana | 2 |
 
-## Links
+### Links
 - [Website](https://markmap.js.org/)
 - [GitHub](https://github.com/gera2ld/markmap)
 `;

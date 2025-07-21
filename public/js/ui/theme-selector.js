@@ -120,7 +120,7 @@
         
         // Get available themes
         const themes = window.MarkdownMindmap.ThemeManager.getAvailableThemes();
-        const currentTheme = window.MarkdownMindmap.ThemeManager.getCurrentTheme().name;
+        const currentTheme = window.MarkdownMindmap.ThemeManager.getCurrentTheme().id;
         
         // Create a card for each theme
         themes.forEach((theme, index) => {

@@ -1,1106 +1,1394 @@
 /**
- * D3 Renderer Module
+ * D3 Renderer Module - Refactored
  * Creates interactive SVG mindmap visualizations using D3.js
  * 
  * @module D3Renderer
  * @requires D3.js v7.9.0
- * @requires TreeNode class from tree-node.js
- * @requires LayoutEngine from layout-engine.js
- * @requires ConfigManager from config.js
  */
 
 (function() {
     'use strict';
 
-    /**
-     * Transform TreeNode structure to d3.hierarchy format
-     * @param {TreeNode} root - Root node from parser
-     * @returns {Object} D3-compatible hierarchical data
-     */
-    function transformToD3Format(root) {
-        function convertNode(node) {
-            if (!node) return null;
-            
-            const name = node.text || '';
-            const detail = node.detail || '';
-            
-            // Detect code blocks in detail content
-            const codeBlockRegex = /^```([a-zA-Z0-9]*)?[\s\S]*```$/;
-            const hasCodeBlock = detail && detail.match && detail.match(codeBlockRegex);
-            let contentType = node.contentType || 'text';
-            let nodeType = node.type || 'text';
-            
-            // If detail contains code block, extract language and content
-            let language = '';
-            let content = '';
-            if (hasCodeBlock) {
-                contentType = 'code';
-                const firstLine = detail.split('\n')[0];
-                language = firstLine.replace('```', '').trim();
-                
-                // Extract code content (without backticks)
-                const lines = detail.split('\n');
-                content = lines.slice(1, lines.length - 1).join('\n');
+    // Constants
+    const CONSTANTS = {
+        DEFAULT_WIDTH: 800,
+        DEFAULT_HEIGHT: 600,
+        ZOOM_EXTENT: [0.1, 4],
+        LAYOUT_PADDING: 80,
+        LAYOUT_MARGIN: 160,
+        ANIMATION_DURATION: 200,
+        TOOLTIP_DELAY: 200,
+        MAX_TEXT_LENGTH: 25,
+        MAX_DETAIL_LINES: 3
+    };
+
+    const DEFAULT_COLORS = [
+        '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
+    ];
+
+    // Data Schema Validators
+    const SchemaValidator = {
+        validateNodeData(nodeData) {
+            if (!nodeData || typeof nodeData !== 'object') {
+                throw new Error('Invalid node data: must be an object');
             }
-            
-            const result = { 
-                name: name,
-                detail: detail,
-                isLeaf: !node.children || node.children.length === 0,
-                // Enhanced with content type data for multi-node styling
-                contentType: contentType,
-                type: nodeType,
-                elements: node.elements || [],
-                nodeId: node.id,
-                headers: node.headers,
-                rows: node.rows,
-                language: language,
-                content: content
+            return true;
+        },
+
+        validateRenderOptions(options) {
+            const defaults = {
+                width: CONSTANTS.DEFAULT_WIDTH,
+                height: CONSTANTS.DEFAULT_HEIGHT,
+                interactive: true,
+                showTooltips: true
             };
-            if (node.children && node.children.length > 0) {
-                result.children = node.children.map(child => convertNode(child));
-            }
-            return result;
+            return { ...defaults, ...options };
         }
+    };
 
-        return convertNode(root);
-    }
-
-    /**
-     * Create D3.js mindmap visualization
-     * @param {Object} data - Hierarchical data in d3.hierarchy format
-     * @param {HTMLElement} container - DOM container for SVG
-     * @param {Object} options - Rendering options from config
-     * @returns {SVGElement} Created SVG element
-     */
-    function createD3Mindmap(data, container, options = {}) {
-        // Force theme cache invalidation on new mindmap creation
-        window.MarkdownMindmap = window.MarkdownMindmap || {};
-        window.MarkdownMindmap.Renderer = window.MarkdownMindmap.Renderer || {};
-        window.MarkdownMindmap.Renderer._themeCacheInvalidated = true;
-        // Ensure D3 is available
-        if (typeof d3 === 'undefined') {
-            throw new Error('D3.js library is required but not available');
-        }
-
-        const width = container.clientWidth || 800;
-        const height = container.clientHeight || 600;
-        
-        // Get theme configuration
-        const config = window.MarkdownMindmap?.Config || {};
-        const themeColors = config.get ? config.get('theme.colors.nodes', ['#dbeafe', '#fef3c7', '#d1fae5', '#fce7f3', '#e0e7ff']) : 
-                           ['#dbeafe', '#fef3c7', '#d1fae5', '#fce7f3', '#e0e7ff'];
-        const fontSize = config.get ? config.get('theme.fonts.size.node', 12) : 12;
-        
-        // Clear container
-        d3.select(container).selectAll("*").remove();
-        
-        // Create SVG with zoom behavior
-        const svg = d3.select(container)
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height)
-            .attr("viewBox", `0 0 ${width} ${height}`)
-            .style("background", "transparent");
-        
-        // Add zoom behavior
-        const zoom = d3.zoom()
-            .scaleExtent([0.1, 4])
-            .on("zoom", (event) => {
-                g.attr("transform", event.transform);
-            });
-        
-        svg.call(zoom);
-        
-        // Add click handler to hide tooltips when clicking on empty space
-        svg.on("click", function(event) {
-            // Only hide if clicking directly on SVG (not on nodes)
-            if (event.target === this || event.target.tagName === 'svg') {
-                if (window.TreeInteraction?.TooltipManager) {
-                    window.TreeInteraction.TooltipManager.hideAllTooltips();
-                } else {
-                    d3.selectAll(".mindmap-tooltip").remove();
-                }
+    // Pure Logic Layer - No Browser Dependencies
+    const ColorUtils = {
+        /**
+         * Shift hue of a hex color
+         */
+        shiftHue(hexColor, degrees) {
+            if (!hexColor || hexColor === 'none' || !hexColor.startsWith('#')) {
+                return '#3b82f6';
             }
-        });
-        
-        const g = svg.append("g");
-        
-        // Create tree layout
-        const tree = d3.tree().size([width - 160, height - 160]);
-        
-        // Convert data to hierarchy
-        const root = d3.hierarchy(data);
-        tree(root);
-        
-        // Create links with curved paths
-        const link = g.selectAll(".link")
-            .data(root.links())
-            .enter().append("path")
-            .attr("class", "link")
-            .attr("d", d3.linkHorizontal()
-                .x(d => d.y + 80)
-                .y(d => d.x + 80))
-            .style("fill", "none")
-            .style("stroke", "#999")
-            .style("stroke-width", 2)
-            .style("stroke-opacity", 0.6);
-        
-        // Create node groups
-        const node = g.selectAll(".node")
-            .data(root.descendants())
-            .enter().append("g")
-            .attr("class", "node")
-            .attr("transform", d => `translate(${d.y + 80},${d.x + 80})`);
-        
-        // Enhanced node creation with multi-type styling
-        node.each(function(d) {
-            const nodeGroup = d3.select(this);
-            const styling = getNodeStyling(d.data, d.depth, { colors: { nodes: themeColors } });
             
-            // Create shape based on content type
-            const shape = createNodeShape(nodeGroup, styling, d.data);
-            shape.style("cursor", "pointer");
-            
-            // Add content-specific enhancements
-            addContentEnhancements(nodeGroup, d.data, styling);
-            
-            // Store node data for interactions
-            nodeGroup.attr('data-node-id', d.data.nodeId || `node-${d.depth}-${d.index}`)
-                     .attr('data-content-type', d.data.contentType || 'text');
-        });
-        
-        // Add text labels
-        node.append("text")
-            .attr("dy", ".35em")
-            .attr("x", d => d.children ? -13 : 13)
-            .style("text-anchor", d => d.children ? "end" : "start")
-            .style("font-size", `${fontSize}px`)
-            .style("font-family", "system-ui, sans-serif")
-            .style("fill", "currentColor")
-            .style("user-select", "none")
-            .style("pointer-events", "none")
-            .each(function(d) {
-                const textElement = d3.select(this);
-                const name = d.data.name || d.data.text || "";
-                const detail = d.data.detail || "";
-                const isLeaf = d.data.isLeaf;
-                
-                // For leaf nodes with detail, show both name and detail
-                // Check if we're dealing with a code block
-                const isCodeBlock = d.data.contentType === 'code' || 
-                                  (detail && detail.trim && detail.trim().startsWith('```'));
-                
-                // Always add the main title/name
-                textElement.append("tspan")
-                    .attr("x", d.children ? -13 : 13)
-                    .attr("dy", "0em")
-                    .style("font-weight", "bold")
-                    .text(name.length > 25 ? name.substring(0, 22) + "..." : name);
-                
-                if (detail && detail.trim && detail.trim()) {
-                    if (isCodeBlock) {
-                        // Extract language if present
-                        let language = '';
-                        const firstLine = detail.split('\n')[0];
-                        if (firstLine.startsWith('```')) {
-                            language = firstLine.replace('```', '').trim();
-                            
-                            // Add language indicator
-                            if (language) {
-                                textElement.append("tspan")
-                                    .attr("x", d.children ? -13 : 13)
-                                    .attr("dy", "1.2em")
-                                    .style("font-size", `${fontSize - 1}px`)
-                                    .style("font-weight", "normal")
-                                    .style("fill", "#10b981")
-                                    .text(`Language: ${language}`);
-                            }
-                        }
-                        
-                        // Get code content (skip first and last line with ```)  
-                        const lines = detail.split('\n');
-                        const codeLines = lines.slice(1, lines.length - 1);
-                        
-                        // Show at most 2 lines of code
-                        const displayLines = codeLines.slice(0, 2);
-                        displayLines.forEach((line) => {
-                            textElement.append("tspan")
-                                .attr("x", d.children ? -13 : 13)
-                                .attr("dy", "1.2em")
-                                .style("font-size", `${fontSize - 1}px`)
-                                .style("font-weight", "normal")
-                                .style("font-family", "monospace")
-                                .style("fill", "#666")
-                                .text(line.length > 25 ? line.substring(0, 22) + "..." : line);
-                        });
-                        
-                        // Add ellipsis if there are more lines
-                        if (codeLines.length > 2) {
-                            textElement.append("tspan")
-                                .attr("x", d.children ? -13 : 13)
-                                .attr("dy", "1.2em")
-                                .style("font-size", `${fontSize - 1}px`)
-                                .style("fill", "#666")
-                                .text("...");
-                        }
-                    } else {
-                        // Regular detail content
-                        const detailLines = detail.split('\n').filter(line => line.trim()).slice(0, 3);
-                        detailLines.forEach((line) => {
-                            textElement.append("tspan")
-                                .attr("x", d.children ? -13 : 13)
-                                .attr("dy", "1.2em")
-                                .style("font-size", `${fontSize - 1}px`)
-                                .style("font-weight", "normal")
-                                .style("fill", "#666")
-                                .text(line.length > 30 ? line.substring(0, 27) + "..." : line);
-                        });
-                        
-                        // Add ellipsis if there are more lines
-                        if (detail.split('\n').filter(line => line.trim()).length > 3) {
-                            textElement.append("tspan")
-                                .attr("x", d.children ? -13 : 13)
-                                .attr("dy", "1.2em")
-                                .style("font-size", `${fontSize - 1}px`)
-                                .style("fill", "#666")
-                                .text("...");
-                        }
-                    }
-                }
-            });
-        
-        // Add hover effects (no tooltips on hover)
-        node
-            .on("mouseover", function(event, d) {
-                const nodeGroup = d3.select(this);
-                const styling = getNodeStyling(d.data, d.depth);
-                
-                // Enhanced hover effects based on shape type
-                if (styling.shape === 'circle') {
-                    nodeGroup.select("circle")
-                        .transition()
-                        .duration(200)
-                        .attr("r", d.depth === 0 ? 10 : 8)
-                        .style("stroke-width", 3);
-                } else if (styling.shape === 'rect' || styling.shape === 'roundedRect') {
-                    nodeGroup.select("rect")
-                        .transition()
-                        .duration(200)
-                        .style("stroke-width", 3)
-                        .style("filter", "brightness(1.1)");
-                } else if (styling.shape === 'diamond') {
-                    nodeGroup.select("polygon")
-                        .transition()
-                        .duration(200)
-                        .style("stroke-width", 3)
-                        .style("filter", "brightness(1.1)");
-                }
-            })
-            .on("mouseout", function(event, d) {
-                const nodeGroup = d3.select(this);
-                const styling = getNodeStyling(d.data, d.depth);
-                
-                // Reset hover effects based on shape type
-                if (styling.shape === 'circle') {
-                    nodeGroup.select("circle")
-                        .transition()
-                        .duration(200)
-                        .attr("r", d.depth === 0 ? 8 : 6)
-                        .style("stroke-width", 2);
-                } else if (styling.shape === 'rect' || styling.shape === 'roundedRect') {
-                    nodeGroup.select("rect")
-                        .transition()
-                        .duration(200)
-                        .style("stroke-width", styling.strokeWidth)
-                        .style("filter", "none");
-                } else if (styling.shape === 'diamond') {
-                    nodeGroup.select("polygon")
-                        .transition()
-                        .duration(200)
-                        .style("stroke-width", styling.strokeWidth)
-                        .style("filter", "none");
-                }
-            })
-            .on("click", function(event, d) {
-                event.stopPropagation(); // Prevent event bubbling
-                
-                // Show enhanced tooltip on click
-                if (window.TreeInteraction?.TooltipManager) {
-                    // Hide any existing tooltips first
-                    window.TreeInteraction.TooltipManager.hideAllTooltips();
-                    
-                    // Show tooltip for this node
-                    window.TreeInteraction.TooltipManager.showTooltip(this, d.data, {
-                        showDelay: 0, // Show immediately on click
-                        maxWidth: 450,
-                        maxHeight: 350,
-                        allowInteraction: true // Allow tooltip interaction
-                    });
-                } else {
-                    // Fallback to basic tooltip
-                    d3.selectAll(".mindmap-tooltip").remove(); // Remove existing
-                    showBasicTooltip(event, d.data);
-                }
-                
-                // Integrate with animation system and expansion controls
-                if (window.TreeInteraction?.D3Animations?.isInitialized) {
-                    const nodeId = d.data.id || d.data.name || `node-${d.depth}-${d.index}`;
-                    
-                    // Check if node has expandable content
-                    if (d.data.detail || d.data.contentType || (d.children && d.children.length > 0)) {
-                        // Emit expansion event for coordination
-                        if (window.MindmapEvents) {
-                            window.MindmapEvents.emit('node:clicked', {
-                                nodeId,
-                                nodeData: d.data,
-                                hasExpandableContent: true,
-                                position: { x: d.x, y: d.y }
-                            });
-                        }
-                    }
-                }
-            });
-        
-        // Center the view
-        const bounds = g.node().getBBox();
-        const fullWidth = width;
-        const fullHeight = height;
-        const centerX = bounds.x + bounds.width / 2;
-        const centerY = bounds.y + bounds.height / 2;
-        const scale = Math.min(fullWidth / bounds.width, fullHeight / bounds.height) * 0.8;
-        const translate = [fullWidth / 2 - scale * centerX, fullHeight / 2 - scale * centerY];
-        
-        svg.call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
-        
-        // Initialize animation coordinator if available
-        if (window.TreeInteraction?.D3Animations && !window.TreeInteraction.D3Animations.isInitialized) {
             try {
-                window.TreeInteraction.D3Animations.init(svg.node(), {
-                    respectReducedMotion: true,
-                    maxConcurrentAnimations: 10
-                });
-            } catch (error) {
-                console.warn('Failed to initialize D3 animations:', error);
+                let r = parseInt(hexColor.slice(1, 3), 16);
+                let g = parseInt(hexColor.slice(3, 5), 16);
+                let b = parseInt(hexColor.slice(5, 7), 16);
+                
+                r /= 255; g /= 255; b /= 255;
+                
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                let h, s, l = (max + min) / 2;
+                
+                if (max === min) {
+                    h = s = 0;
+                } else {
+                    const d = max - min;
+                    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                    
+                    switch (max) {
+                        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                        case g: h = (b - r) / d + 2; break;
+                        case b: h = (r - g) / d + 4; break;
+                    }
+                    h /= 6;
+                }
+                
+                h = (h * 360 + degrees) % 360 / 360;
+                
+                let r1, g1, b1;
+                if (s === 0) {
+                    r1 = g1 = b1 = l;
+                } else {
+                    const hue2rgb = (p, q, t) => {
+                        if (t < 0) t += 1;
+                        if (t > 1) t -= 1;
+                        if (t < 1/6) return p + (q - p) * 6 * t;
+                        if (t < 1/2) return q;
+                        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                        return p;
+                    };
+                    
+                    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                    const p = 2 * l - q;
+                    
+                    r1 = hue2rgb(p, q, h + 1/3);
+                    g1 = hue2rgb(p, q, h);
+                    b1 = hue2rgb(p, q, h - 1/3);
+                }
+                
+                const toHex = x => {
+                    const hex = Math.round(x * 255).toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                };
+                
+                return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
+            } catch (e) {
+                console.error('Error shifting hue:', e);
+                return hexColor;
             }
-        }
-        
-        return svg.node();
-    }
+        },
 
-    /**
-     * Get node color based on level and theme
-     * @param {number} level - Node depth level
-     * @param {Object} theme - Theme configuration
-     * @returns {string} Color hex code
-     */
-    function getNodeColor(level, theme = {}) {
-        console.log('%c[4] D3 Renderer → getNodeColor for level: ' + level, 'background:#9933cc;color:white;padding:3px;font-weight:bold');
-        
-        // Default colors if no theme or level-specific colors
-        const defaultColors = [
-            '#3b82f6', // blue
-            '#10b981', // emerald
-            '#f59e0b', // amber
-            '#8b5cf6', // violet
-            '#ec4899', // pink
-        ];
-        
-        // If we have theme node colors, use them
-        if (theme && theme.colors) {
-            console.log('  Using theme object colors');
-            const color = theme.colors[level] || theme.colors.accent || defaultColors[level % defaultColors.length];
-            console.log('  → Selected color from theme object:', color);
-            return color;
+        validateHexColor(color) {
+            return /^#[0-9A-F]{6}$/i.test(color);
         }
-        
-        // Check if we have CSS custom properties for theme - ALWAYS CHECK FRESH
-        if (typeof window !== 'undefined' && window.getComputedStyle) {
+    };
+
+    const DataTransformer = {
+        /**
+         * Transform TreeNode structure to d3.hierarchy format
+         */
+        transformToD3Format(root) {
+            SchemaValidator.validateNodeData(root);
+
+            const convertNode = (node) => {
+                if (!node) return null;
+                
+                const name = node.text || '';
+                const detail = node.detail || '';
+                
+                const codeBlockRegex = /^```([a-zA-Z0-9]*)?[\s\S]*```$/;
+                const hasCodeBlock = detail && detail.match?.(codeBlockRegex);
+                let contentType = node.contentType || 'text';
+                let nodeType = node.type || 'text';
+                
+                let language = '';
+                let content = '';
+                if (hasCodeBlock) {
+                    contentType = 'code';
+                    const firstLine = detail.split('\n')[0];
+                    language = firstLine.replace('```', '').trim();
+                    
+                    const lines = detail.split('\n');
+                    content = lines.slice(1, lines.length - 1).join('\n');
+                }
+                
+                const result = { 
+                    name,
+                    detail,
+                    isLeaf: !node.children || node.children.length === 0,
+                    contentType,
+                    type: nodeType,
+                    elements: node.elements || [],
+                    nodeId: node.id,
+                    headers: node.headers,
+                    rows: node.rows,
+                    language,
+                    content
+                };
+                
+                if (node.children?.length > 0) {
+                    result.children = node.children.map(child => convertNode(child));
+                }
+                return result;
+            };
+
+            return convertNode(root);
+        }
+    };
+
+    const NodeStyleCalculator = {
+        /**
+         * Calculate node styling based on content type
+         */
+        calculateStyling(nodeData, theme = {}) {
+            const contentType = nodeData.contentType || 'text';
+            const hasCodeChildren = nodeData.children?.some(child => 
+                child.type === 'code' || child.contentType === 'code'
+            );
+            const detailHasCode = nodeData.detail?.includes('```');
+            
+            const stylingMap = {
+                text: {
+                    shape: 'circle',
+                    fill: theme.nodeColors?.text || '#3b82f6',
+                    stroke: theme.nodeStrokeColors?.text || '#3b82f6',
+                    strokeWidth: 2,
+                    radius: 8
+                },
+                table: {
+                    shape: 'rect',
+                    fill: theme.nodeColors?.table || '#10b981',
+                    stroke: theme.nodeStrokeColors?.table || '#10b981',
+                    strokeWidth: 2,
+                    width: 22,
+                    height: 16
+                },
+                code: {
+                    shape: 'roundedRect',
+                    fill: theme.nodeColors?.code || '#6366f1',
+                    stroke: theme.nodeStrokeColors?.code || '#6366f1',
+                    strokeWidth: 2,
+                    width: 24,
+                    height: 16,
+                    rx: 4
+                },
+                list: {
+                    shape: 'diamond',
+                    fill: theme.nodeColors?.list || '#f59e0b',
+                    stroke: theme.nodeStrokeColors?.list || '#f59e0b',
+                    strokeWidth: 2,
+                    size: 10
+                },
+                header: {
+                    shape: 'circle',
+                    fill: theme.nodeColors?.header || '#3b82f6',
+                    stroke: theme.nodeStrokeColors?.header || '#3b82f6',
+                    strokeWidth: 2,
+                    radius: 8,
+                    fontWeight: 'bold'
+                }
+            };
+            
+            if (contentType === 'code') {
+                return stylingMap.code;
+            } else if (nodeData.type === 'header' && (hasCodeChildren || detailHasCode)) {
+                return { ...stylingMap.header, ...stylingMap.code };
+            } else if (detailHasCode) {
+                return { ...stylingMap[nodeData.type || 'text'], ...stylingMap.code };
+            }
+            
+            return stylingMap[contentType] || stylingMap.text;
+        },
+
+        /**
+         * Get node color based on level and theme
+         */
+        getNodeColor(level, theme = {}) {
+            if (theme?.colors) {
+                const color = theme.colors[level] || theme.colors.accent || DEFAULT_COLORS[level % DEFAULT_COLORS.length];
+                return color;
+            }
+            
+            return DEFAULT_COLORS[level % DEFAULT_COLORS.length];
+        }
+    };
+
+    // Browser Interface Layer
+    const ThemeProvider = {
+        _cache: null,
+        _cacheInvalidated: true,
+
+        getCurrentTheme() {
+            if (this._cache && !this._cacheInvalidated) {
+                return this._cache;
+            }
+
+            if (typeof window === 'undefined' || !window.getComputedStyle) {
+                return this._getDefaultTheme();
+            }
+
             try {
-                console.log('  Checking CSS custom properties for theme colors');
                 const root = document.documentElement;
-                console.log('  Current theme from HTML data attribute:', root.getAttribute('data-theme'));
                 const style = getComputedStyle(root);
                 
-                // Get theme colors from CSS variables
                 const accent = style.getPropertyValue('--theme-accent').trim();
                 const primary = style.getPropertyValue('--theme-primary').trim();
                 const secondary = style.getPropertyValue('--theme-secondary').trim();
                 
-                console.log('  CSS Variables:', {
-                    accent: accent || 'not set',
-                    primary: primary || 'not set',
-                    secondary: secondary || 'not set'
-                });
-                
                 if (accent && primary && secondary) {
-                    // Create a palette from theme colors
-                    const themePalette = [
-                        accent,
-                        primary,
-                        secondary,
-                        shiftHue(accent, 30),  // Shifted version of accent
-                        shiftHue(primary, 45)  // Shifted version of primary
-                    ];
-                    const color = themePalette[level % themePalette.length];
-                    console.log('  → Selected color from CSS variables:', color);
-                    return color;
+                    const theme = {
+                        colors: {
+                            accent,
+                            primary, 
+                            secondary,
+                            nodes: [
+                                accent,
+                                primary,
+                                secondary,
+                                ColorUtils.shiftHue(accent, 30),
+                                ColorUtils.shiftHue(primary, 45)
+                            ]
+                        }
+                    };
+                    
+                    this._cache = theme;
+                    this._cacheInvalidated = false;
+                    return theme;
                 }
             } catch (e) {
-                console.warn('  Error accessing CSS theme variables:', e);
-            }
-        }
-        
-        // Fallback to default colors
-        const fallbackColor = defaultColors[level % defaultColors.length];
-        console.log('  → Using fallback color:', fallbackColor);
-        return fallbackColor;
-    }
-    
-    /**
-     * Helper function to shift hue of a color
-     * @param {string} hexColor - Hex color code
-     * @param {number} degrees - Degrees to shift hue
-     * @returns {string} New hex color
-     */
-    function shiftHue(hexColor, degrees) {
-        // Default if invalid input
-        if (!hexColor || hexColor === 'none' || !hexColor.startsWith('#')) {
-            return '#3b82f6';
-        }
-        
-        try {
-            // Convert hex to RGB
-            let r = parseInt(hexColor.slice(1, 3), 16);
-            let g = parseInt(hexColor.slice(3, 5), 16);
-            let b = parseInt(hexColor.slice(5, 7), 16);
-            
-            // Convert RGB to HSL
-            r /= 255;
-            g /= 255;
-            b /= 255;
-            
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            let h, s, l = (max + min) / 2;
-            
-            if (max === min) {
-                h = s = 0; // achromatic
-            } else {
-                const d = max - min;
-                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                
-                switch (max) {
-                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                    case g: h = (b - r) / d + 2; break;
-                    case b: h = (r - g) / d + 4; break;
-                }
-                
-                h /= 6;
+                console.warn('Error accessing CSS theme variables:', e);
             }
             
-            // Shift hue
-            h = (h * 360 + degrees) % 360 / 360;
-            
-            // Convert back to RGB
-            let r1, g1, b1;
-            
-            if (s === 0) {
-                r1 = g1 = b1 = l; // achromatic
-            } else {
-                const hue2rgb = (p, q, t) => {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1/6) return p + (q - p) * 6 * t;
-                    if (t < 1/2) return q;
-                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                    return p;
-                };
-                
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                
-                r1 = hue2rgb(p, q, h + 1/3);
-                g1 = hue2rgb(p, q, h);
-                b1 = hue2rgb(p, q, h - 1/3);
-            }
-            
-            // Convert to hex
-            const toHex = x => {
-                const hex = Math.round(x * 255).toString(16);
-                return hex.length === 1 ? '0' + hex : hex;
-            };
-            
-            return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
-        } catch (e) {
-            console.error('Error shifting hue:', e);
-            return hexColor; // Return original if error
-        }
-    }
+            return this._getDefaultTheme();
+        },
 
-    /**
-     * Get node styling based on node data
-     * @param {Object} nodeData - Node data
-     * @param {number} level - Node level
-     * @param {Object} theme - Theme configuration
-     * @returns {Object} Node styling information
-     */
-    function getNodeStyling(nodeData, level, theme = {}) {
-        // Prioritize explicit code contentType or code in detail
-        const contentType = nodeData.contentType || 'text';
-        
-        // Check if node has code children
-        const hasCodeChildren = nodeData.children && nodeData.children.some(child => {
-            return child.type === 'code' || child.contentType === 'code';
-        });
-        
-        // Check if detail contains code block
-        const detailHasCode = nodeData.detail && nodeData.detail.includes('```');
-        
-        // Create base styling map
-        const stylingMap = {
-            text: {
-                shape: 'circle',
-                fill: theme.nodeColors?.text || '#3b82f6',
-                stroke: theme.nodeStrokeColors?.text || '#3b82f6',
-                strokeWidth: 2,
-                textAnchor: 'start',
-                fontSize: '12px',
-                fontWeight: 'normal',
-                textColor: theme.textColor || 'currentcolor',
-                detailColor: theme.detailColor || '#666',
-                icon: null,
-                radius: 8 // Default circle radius
-            },
-            table: {
-                shape: 'rect',
-                fill: theme.nodeColors?.table || '#10b981',
-                stroke: theme.nodeStrokeColors?.table || '#10b981',
-                strokeWidth: 2,
-                textAnchor: 'start',
-                fontSize: '12px',
-                fontWeight: 'normal',
-                textColor: theme.textColor || 'currentcolor',
-                detailColor: theme.detailColor || '#666',
-                icon: 'table',
-                width: 22,  // Default width for tables
-                height: 16  // Default height for tables
-            },
-            code: {
-                shape: 'roundedRect',
-                fill: theme.nodeColors?.code || '#6366f1',
-                stroke: theme.nodeStrokeColors?.code || '#6366f1',
-                strokeWidth: 2,
-                textAnchor: 'start',
-                fontSize: '12px',
-                fontWeight: 'normal',
-                textColor: theme.textColor || 'currentcolor',
-                detailColor: theme.detailColor || '#666',
-                icon: 'code',
-                width: 24,  // Default width for code blocks
-                height: 16, // Default height for code blocks
-                rx: 4      // Corner radius for rounded rectangles
-            },
-            list: {
-                shape: 'diamond',
-                fill: theme.nodeColors?.list || '#f59e0b',
-                stroke: theme.nodeStrokeColors?.list || '#f59e0b',
-                strokeWidth: 2,
-                textAnchor: 'start',
-                fontSize: '12px',
-                fontWeight: 'normal',
-                textColor: theme.textColor || 'currentcolor',
-                detailColor: theme.detailColor || '#666',
-                icon: 'list',
-                size: 10  // Size of diamond shape
-            },
-            header: {
-                shape: 'circle',
-                fill: theme.nodeColors?.header || '#3b82f6',
-                stroke: theme.nodeStrokeColors?.header || '#3b82f6',
-                strokeWidth: 2,
-                textAnchor: 'start',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                textColor: theme.textColor || 'currentcolor',
-                detailColor: theme.detailColor || '#666',
-                icon: null,
-                radius: 8 // Default circle radius
-            }
-        };
-        
-        // Determine the most appropriate styling based on content
-        if (contentType === 'code') {
-            // Pure code node
-            return stylingMap.code;
-        } else if (nodeData.type === 'header' && (hasCodeChildren || detailHasCode)) {
-            // Header with code content
+        _getDefaultTheme() {
             return {
-                ...stylingMap.header,
-                shape: 'roundedRect',
-                fill: theme.nodeColors?.code || '#6366f1',
-                stroke: theme.nodeStrokeColors?.code || '#6366f1',
-                icon: 'code',
-                width: 24,
-                height: 16,
-                rx: 4
+                colors: {
+                    accent: DEFAULT_COLORS[0],
+                    primary: DEFAULT_COLORS[1],
+                    secondary: DEFAULT_COLORS[2],
+                    nodes: DEFAULT_COLORS
+                }
             };
-        } else if (detailHasCode) {
-            // Any node with code in detail
-            return {
-                ...stylingMap[nodeData.type || 'text'],
-                shape: 'roundedRect',
-                fill: theme.nodeColors?.code || '#6366f1',
-                stroke: theme.nodeStrokeColors?.code || '#6366f1',
-                icon: 'code',
-                width: 24,
-                height: 16,
-                rx: 4
-            };
-        }
-        
-        // Fall back to standard styling
-        return stylingMap[contentType] || stylingMap.text;
-    }
+        },
 
-    /**
-     * Create SVG shape based on node styling
-     * @param {d3.Selection} nodeSelection - D3 selection for node group
-     * @param {Object} styling - Styling properties
-     * @param {Object} nodeData - Node data
-     */
-    function createNodeShape(nodeSelection, styling, nodeData) {
-        let shape;
-        
-        switch (styling.shape) {
-            case 'rect':
-                shape = nodeSelection.append('rect')
-                    .attr('width', styling.width)
-                    .attr('height', styling.height)
-                    .attr('x', -styling.width / 2)
-                    .attr('y', -styling.height / 2);
-                break;
+        invalidateCache() {
+            this._cacheInvalidated = true;
+        },
+
+        onThemeChange(callback) {
+            if (typeof window !== 'undefined') {
+                window.MarkdownMindmap = window.MarkdownMindmap || {};
+                window.MarkdownMindmap.ThemeManager = window.MarkdownMindmap.ThemeManager || {};
                 
-            case 'roundedRect':
-                shape = nodeSelection.append('rect')
-                    .attr('width', styling.width)
-                    .attr('height', styling.height)
-                    .attr('x', -styling.width / 2)
-                    .attr('y', -styling.height / 2)
-                    .attr('rx', styling.rx);
-                break;
-                
-            case 'diamond':
-                const size = styling.size;
-                const points = [
-                    [0, -size],
-                    [size, 0],
-                    [0, size],
-                    [-size, 0]
-                ];
-                shape = nodeSelection.append('polygon')
-                    .attr('points', points.map(p => p.join(',')).join(' '));
-                break;
-                
-            case 'circle':
-            default:
-                shape = nodeSelection.append('circle')
-                    .attr('r', styling.radius);
-                break;
+                const originalCallback = window.MarkdownMindmap.ThemeManager.onThemeChange;
+                if (typeof originalCallback === 'function') {
+                    originalCallback((themeName, themeData) => {
+                        this.invalidateCache();
+                        callback(themeName, themeData);
+                    });
+                }
+            }
         }
-        
-        // Apply common styling
-        shape
-            .style('fill', styling.fill)
-            .style('stroke', styling.stroke)
-            .style('stroke-width', styling.strokeWidth)
-            .attr('class', `mindmap-node-${nodeData.contentType || 'text'}`);
+    };
+
+    // DOM Renderer Class - Handles all browser interactions
+    class DOMRenderer {
+        constructor(d3Instance = window.d3) {
+            if (!d3Instance) {
+                throw new Error('D3.js library is required but not available');
+            }
+            this.d3 = d3Instance;
+        }
+
+        /**
+         * Create SVG container with zoom behavior
+         */
+        createSVG(container, options) {
+            if (!container) {
+                throw new Error('Container element is required but was not found');
+            }
             
-        return shape;
-    }
+            const validOptions = SchemaValidator.validateRenderOptions(options);
+            const width = container.clientWidth || validOptions.width;
+            const height = container.clientHeight || validOptions.height;
+            
+            this.d3.select(container).selectAll("*").remove();
+            
+            const svg = this.d3.select(container)
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .style("background", "transparent");
+            
+            if (validOptions.interactive) {
+                this._addZoomBehavior(svg);
+                this._addClickHandler(svg);
+            }
+            
+            return { svg, width, height };
+        }
 
-    /**
-     * Add content-specific visual enhancements to nodes
-     * @param {d3.Selection} nodeSelection - D3 selection for node group
-     * @param {Object} nodeData - Node data
-     * @param {Object} styling - Node styling properties
-     */
-    function addContentEnhancements(nodeSelection, nodeData, styling) {
-        // Add icon if specified
-        if (styling.icon) {
-            nodeSelection.append('text')
-                .text(function() {
-                    // Use icon mapping or fallback to icon name
-                    const iconMap = {
-                        'code': '⌨',
-                        'table': '⊞',
-                        'list': '≡'
-                    };
-                    return iconMap[styling.icon] || styling.icon;
-                })
-                .attr('x', 0)
-                .attr('y', 0)
-                .attr('text-anchor', 'middle')
-                .attr('dominant-baseline', 'central')
-                .attr('font-size', '8px')
-                .attr('class', 'node-icon');
+        _addZoomBehavior(svg) {
+            const zoom = this.d3.zoom()
+                .scaleExtent(CONSTANTS.ZOOM_EXTENT)
+                .on("zoom", (event) => {
+                    svg.select(".main-group").attr("transform", event.transform);
+                });
+            
+            svg.call(zoom);
         }
-        
-        // First check for explicit node type
-        const nodeType = nodeData.type || nodeData.contentType || 'text';
-        
-        // Add type-specific indicators
-        switch (nodeType) {
-            case 'table':
-                if (nodeData.headers && nodeData.rows) {
-                    const indicator = nodeSelection.append('text')
-                        .text(`${nodeData.headers.length}×${nodeData.rows.length}`)
-                        .attr('x', 0)
-                        .attr('y', 12)
-                        .attr('text-anchor', 'middle')
-                        .attr('font-size', '6px')
-                        .attr('fill', '#6b7280')
-                        .attr('class', 'table-indicator');
-                }
-                break;
-                
-            case 'code':
-                if (nodeData.language) {
-                    nodeSelection.append('text')
-                        .text(nodeData.language.toUpperCase())
-                        .attr('x', 0)
-                        .attr('y', 12)
-                        .attr('text-anchor', 'middle')
-                        .attr('font-size', '5px')
-                        .attr('fill', '#10b981')
-                        .attr('class', 'code-indicator');
-                }
-                break;
-                
-            case 'list':
-                if (nodeData.elements && nodeData.elements.length > 0) {
-                    nodeSelection.append('text')
-                        .text(`${nodeData.elements.length}`)
-                        .attr('x', 0)
-                        .attr('y', 12)
-                        .attr('text-anchor', 'middle')
-                        .attr('font-size', '6px')
-                        .attr('fill', '#f59e0b')
-                        .attr('class', 'list-indicator');
-                }
-                break;
-        }
-        
-        // Special handling for nodes that contain code blocks
-        if (nodeData.hasCodeChildren || (nodeData.content && nodeData.content.includes('```'))) {
-            nodeSelection.append('text')
-                .text('CODE')
-                .attr('x', 0)
-                .attr('y', 12)
-                .attr('text-anchor', 'middle')
-                .attr('font-size', '5px')
-                .attr('fill', '#10b981')
-                .attr('class', 'code-parent-indicator');
-        }
-    }
 
-    /**
-     * Create enhanced tooltip content based on node type
-     * @param {Object} nodeData - Node data
-     * @param {string} text - Node text
-     * @param {string} detail - Node detail
-     * @param {boolean} isLeaf - Whether node is a leaf
-     * @returns {string} Formatted tooltip content
-     */
-    function createTooltipContent(nodeData, text, detail, isLeaf) {
-        let content = text;
-        const contentType = nodeData.contentType || 'text';
-        
-        // Add content type indicator
-        if (contentType !== 'text') {
-            content = `[${contentType.toUpperCase()}] ${content}`;
-        }
-        
-        // Add type-specific information
-        switch (contentType) {
-            case 'table':
-                if (nodeData.headers && nodeData.rows) {
-                    content += `\n\nTable: ${nodeData.headers.length} columns, ${nodeData.rows.length} rows`;
-                    if (nodeData.headers.length > 0) {
-                        content += `\nColumns: ${nodeData.headers.slice(0, 3).join(', ')}${nodeData.headers.length > 3 ? '...' : ''}`;
+        _addClickHandler(svg) {
+            svg.on("click", (event) => {
+                if (event.target === event.currentTarget || event.target.tagName === 'svg') {
+                    if (window.TreeInteraction?.TooltipManager) {
+                        window.TreeInteraction.TooltipManager.hideAllTooltips();
+                    } else {
+                        this.d3.selectAll(".mindmap-tooltip").remove();
                     }
                 }
-                break;
-                
-            case 'code':
-                if (nodeData.language) {
-                    content += `\n\nLanguage: ${nodeData.language}`;
-                }
-                if (nodeData.content) {
-                    const lines = nodeData.content.split('\n').length;
-                    content += `\nLines: ${lines}`;
-                    // Show first few lines of code
-                    const preview = nodeData.content.split('\n').slice(0, 3).join('\n');
-                    content += `\n\nPreview:\n${preview}${lines > 3 ? '\n...' : ''}`;
-                }
-                break;
-                
-            case 'list':
-                if (nodeData.elements && nodeData.elements.length > 0) {
-                    content += `\n\nList items: ${nodeData.elements.length}`;
-                    // Show first few list items
-                    const items = nodeData.elements.slice(0, 3);
-                    if (items.length > 0) {
-                        content += `\nItems:\n• ${items.join('\n• ')}${nodeData.elements.length > 3 ? '\n• ...' : ''}`;
-                    }
-                }
-                break;
+            });
         }
-        
-        // Add detail content for leaf nodes
-        if (isLeaf && detail.trim() && contentType === 'text') {
-            content += `\n\n${detail}`;
+
+        /**
+         * Render tree layout with nodes and links
+         */
+        renderTreeLayout(data, svg, width, height, theme) {
+            const g = svg.append("g").attr("class", "main-group");
+            
+            const tree = this.d3.tree().size([height - CONSTANTS.LAYOUT_MARGIN, width - CONSTANTS.LAYOUT_MARGIN]);
+            const root = this.d3.hierarchy(data);
+            tree(root);
+            
+            this._renderLinks(g, root);
+            const nodes = this._renderNodes(g, root, theme);
+            this._centerView(svg, g, width, height);
+            
+            return nodes;
         }
-        
-        return content;
-    }
 
-    // Previous basic tooltip function removed to prevent duplication
+        _renderLinks(g, root) {
+            // Filter links to only connect nodes that will be rendered
+            const filteredLinks = root.links().filter(link => {
+                // Don't render links to special content children that are hidden
+                if (link.source.data.type === 'header' && 
+                    (link.target.data.type === 'code' || link.target.data.contentType === 'code' ||
+                     link.target.data.type === 'table' || link.target.data.contentType === 'table' ||
+                     link.target.data.type === 'list-item' || link.target.data.contentType === 'list-item')) {
+                    return false;
+                }
+                return true;
+            });
+            
+            g.selectAll(".link")
+                .data(filteredLinks)
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("d", this.d3.linkHorizontal()
+                    .x(d => d.y + CONSTANTS.LAYOUT_PADDING)
+                    .y(d => d.x + CONSTANTS.LAYOUT_PADDING))
+                .style("fill", "none")
+                .style("stroke", "#999")
+                .style("stroke-width", 2)
+                .style("stroke-opacity", 0.6);
+        }
 
-    /**
-     * Show basic tooltip on hover
-     * @param {MouseEvent} event - Mouse event
-     * @param {Object} data - Node data
-     */
-    function showBasicTooltip(event, data) {
-        // Create tooltip
-        const tooltip = d3.select('body')
-            .append('div')
-            .attr('class', 'mindmap-tooltip')
-            .style('position', 'absolute')
-            .style('left', `${event.pageX + 10}px`)
-            .style('top', `${event.pageY + 10}px`)
-            .style('background', 'white')
-            .style('border', '1px solid #ddd')
-            .style('border-radius', '4px')
-            .style('padding', '8px')
-            .style('font-size', '12px')
-            .style('max-width', '300px')
-            .style('z-index', '1000');
-        
-        // Add title
-        tooltip.append('div')
-            .style('font-weight', 'bold')
-            .style('margin-bottom', '4px')
-            .text(data.name || data.text || '');
-        
-        // Add detail if present
-        if (data.detail) {
-            // Special handling for code blocks
-            if (data.type === 'code' || data.contentType === 'code' || 
-                (data.content && data.content.includes('```'))) {
+        _renderNodes(g, root, theme) {
+            // Filter out special content children that should be rendered inline with their parent
+            const filteredNodes = root.descendants().filter(d => {
+                // Always render root node
+                if (!d.parent) return true;
                 
-                // Try to render code block with specialized renderer if available
-                const codeContainer = tooltip.append('div')
-                    .attr('class', 'code-container')
-                    .style('margin-top', '8px')
-                    .style('max-height', '300px')
-                    .style('overflow', 'auto')
-                    .style('background', '#f5f5f5')
-                    .style('border-radius', '4px')
-                    .style('padding', '8px')
-                    .style('font-family', 'monospace');
+                // If parent is a header and this node is special content, don't render separately
+                if (d.parent.data.type === 'header' && 
+                    (d.data.type === 'code' || d.data.contentType === 'code' ||
+                     d.data.type === 'table' || d.data.contentType === 'table' ||
+                     d.data.type === 'list-item' || d.data.contentType === 'list-item')) {
+                    console.log(`Hiding special content child: "${d.data.text}" (parent: "${d.parent.data.text}")`);
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            console.log(`Rendering ${filteredNodes.length} nodes (filtered from ${root.descendants().length})`);
+            
+            const nodes = g.selectAll(".node")
+                .data(filteredNodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => 
+                    `translate(${d.y + CONSTANTS.LAYOUT_PADDING},${d.x + CONSTANTS.LAYOUT_PADDING})`
+                );
+
+            nodes.each((d, i, nodeElements) => {
+                const nodeGroup = this.d3.select(nodeElements[i]);
+                const styling = NodeStyleCalculator.calculateStyling(d.data, theme);
+                
+                this._createNodeShape(nodeGroup, styling, d.data);
+                this._addNodeText(nodeGroup, d, theme);
+                this._addNodeInteractions(nodeGroup, d);
+                
+                nodeGroup.attr('data-node-id', d.data.nodeId || `node-${d.depth}-${i}`)
+                        .attr('data-content-type', d.data.contentType || 'text');
+            });
+
+            return nodes;
+        }
+
+        _createNodeShape(nodeGroup, styling, nodeData) {
+            let shape;
+            
+            switch (styling.shape) {
+                case 'rect':
+                    shape = nodeGroup.append('rect')
+                        .attr('width', styling.width)
+                        .attr('height', styling.height)
+                        .attr('x', -styling.width / 2)
+                        .attr('y', -styling.height / 2);
+                    break;
+                case 'roundedRect':
+                    shape = nodeGroup.append('rect')
+                        .attr('width', styling.width)
+                        .attr('height', styling.height)
+                        .attr('x', -styling.width / 2)
+                        .attr('y', -styling.height / 2)
+                        .attr('rx', styling.rx);
+                    break;
+                case 'diamond':
+                    const size = styling.size;
+                    const points = [[0, -size], [size, 0], [0, size], [-size, 0]];
+                    shape = nodeGroup.append('polygon')
+                        .attr('points', points.map(p => p.join(',')).join(' '));
+                    break;
+                case 'circle':
+                default:
+                    shape = nodeGroup.append('circle').attr('r', styling.radius);
+                    break;
+            }
+            
+            shape
+                .style('fill', styling.fill)
+                .style('stroke', styling.stroke)
+                .style('stroke-width', styling.strokeWidth)
+                .style('cursor', 'pointer')
+                .attr('class', `mindmap-node-${nodeData.contentType || 'text'}`);
+            
+            return shape;
+        }
+
+        _addNodeText(nodeGroup, d, theme) {
+            const fontSize = theme?.fonts?.size?.node || 12;
+            const nodeData = d.data;
+            
+            // Check if we need to render HTML content inline
+            if (this._shouldRenderInlineContent(nodeData)) {
+                this._addInlineHTMLContent(nodeGroup, d, theme);
+            } else {
+                // Standard text rendering for simple nodes
+                const textElement = nodeGroup.append("text")
+                    .attr("dy", ".35em")
+                    .attr("x", d => d.children ? -13 : 13)
+                    .style("text-anchor", d => d.children ? "end" : "start")
+                    .style("font-size", `${fontSize}px`)
+                    .style("font-family", "system-ui, sans-serif")
+                    .style("fill", "currentColor")
+                    .style("user-select", "none")
+                    .style("pointer-events", "none");
                     
-                // Try to use CodeBlockDisplay if available
-                if (window.MarkdownMindmap?.CodeBlockDisplay) {
-                    try {
-                        const codeRenderer = new window.MarkdownMindmap.CodeBlockDisplay();
-                        const content = data.content || data.detail;
-                        const language = data.language || '';
-                        
-                        codeRenderer.renderCodeBlock({ content, language }, codeContainer.node());
-                    } catch (e) {
-                        // Fallback to simple display
-                        codeContainer.style('white-space', 'pre-wrap')
-                            .text(data.detail || data.content);
-                    }
-                } else {
-                    // Simple code block display
-                    codeContainer.style('white-space', 'pre-wrap')
-                        .text(data.detail || data.content);
+                this._populateTextContent(textElement, nodeData, fontSize);
+            }
+        }
+        
+        _shouldRenderInlineContent(nodeData) {
+            // Check if this is a header node with special content children (PRIMARY CASE)
+            if (nodeData.type === 'header' && nodeData.children && nodeData.children.length > 0) {
+                // Check if any child is a special content type
+                const hasCodeChild = nodeData.children.some(child => child.contentType === 'code' || child.type === 'code');
+                const hasTableChild = nodeData.children.some(child => child.contentType === 'table' || child.type === 'table');
+                const hasListChildren = nodeData.children.every(child => child.contentType === 'list-item' || child.type === 'list-item');
+                
+                if (hasCodeChild) {
+                    console.log(`✓ Header "${nodeData.text}" has code child`);
+                    return true;
                 }
+                if (hasTableChild) {
+                    console.log(`✓ Header "${nodeData.text}" has table child`);
+                    return true;
+                }
+                if (hasListChildren && nodeData.children.length > 0) {
+                    console.log(`✓ Header "${nodeData.text}" has ${nodeData.children.length} list item children`);
+                    return true;
+                }
+            }
+            
+            // Secondary check: node itself has special content type (fallback)
+            if (nodeData.contentType === 'code' || nodeData.contentType === 'table' || nodeData.contentType === 'paragraph') {
+                console.log(`✓ Node "${nodeData.text || nodeData.name}" has direct contentType: ${nodeData.contentType}`);
+                return true;
+            }
+            
+            console.log(`✗ Node "${nodeData.text || nodeData.name}" NO inline content (type: ${nodeData.type}, contentType: ${nodeData.contentType || 'none'}, children: ${nodeData.children ? nodeData.children.length : 0})`);
+            return false;
+        }
+        
+        _addInlineHTMLContent(nodeGroup, d, theme) {
+            const nodeData = d.data;
+            const fontSize = theme?.fonts?.size?.node || 12;
+            
+            // Add the main node label first
+            const labelText = nodeGroup.append("text")
+                .attr("dy", ".35em")
+                .attr("x", -10)  // Move slightly closer to the node
+                .style("text-anchor", "end")
+                .style("font-size", `${fontSize}px`)
+                .style("font-family", "system-ui, sans-serif")
+                .style("fill", "currentColor")
+                .style("user-select", "none")
+                .style("pointer-events", "none")
+                .text(nodeData.name || nodeData.text || "");
+            
+            console.log(`Rendering inline content for "${nodeData.text || nodeData.name}" (type: ${nodeData.type}, contentType: ${nodeData.contentType})`);
+            
+            // Handle header nodes with special content children (PRIMARY CASE)
+            if (nodeData.type === 'header' && nodeData.children && nodeData.children.length > 0) {
+                // Find code child
+                const codeChild = nodeData.children.find(child => child.contentType === 'code' || child.type === 'code');
+                if (codeChild) {
+                    console.log(`Adding inline code content from child: "${codeChild.text}"`);
+                    this._addInlineCodeContent(nodeGroup, codeChild, 0, theme);
+                    return;
+                }
+                
+                // Find table child
+                const tableChild = nodeData.children.find(child => child.contentType === 'table' || child.type === 'table');
+                if (tableChild) {
+                    console.log(`Adding inline table content from child: "${tableChild.text}"`);
+                    this._addInlineTableContent(nodeGroup, tableChild, 0, theme);
+                    return;
+                }
+                
+                // Check for list item children
+                const listChildren = nodeData.children.filter(child => child.contentType === 'list-item' || child.type === 'list-item');
+                if (listChildren.length > 0) {
+                    console.log(`Adding inline link content for ${listChildren.length} links`);
+                    listChildren.forEach((child, index) => {
+                        this._addInlineLinkContent(nodeGroup, child, index * 25, theme);
+                    });
+                    return;
+                }
+            }
+            
+            // Handle nodes with direct content types (FALLBACK CASE)
+            if (nodeData.contentType === 'code') {
+                console.log(`Adding inline code content (direct)`);
+                this._addInlineCodeContent(nodeGroup, nodeData, 0, theme);
+            } else if (nodeData.contentType === 'table') {
+                console.log(`Adding inline table content (direct)`);
+                this._addInlineTableContent(nodeGroup, nodeData, 0, theme);
+            } else if (nodeData.contentType === 'paragraph') {
+                console.log(`Adding inline paragraph content (direct)`);
+                this._addInlineParagraphContent(nodeGroup, nodeData, 0, theme);
             } else {
-                // Regular detail display
+                console.log(`No matching content type handler found`);
+            }
+        }
+
+        _populateTextContent(textElement, nodeData, fontSize) {
+            let displayName = nodeData.name || nodeData.text || "";
+            
+            // For nodes without special children, show enhanced content type display
+            if (nodeData.contentType && nodeData.contentType !== 'text' && !this._shouldRenderInlineContent(nodeData)) {
+                switch (nodeData.contentType) {
+                    case 'code':
+                        displayName = `${nodeData.language || 'Code'}: ${displayName.replace('Code: ', '')}`;
+                        break;
+                    case 'table':
+                        const colCount = nodeData.headers ? nodeData.headers.length : (nodeData.rows && nodeData.rows[0] ? nodeData.rows[0].length : 0);
+                        const rowCount = nodeData.rows ? nodeData.rows.length : 0;
+                        displayName = `Table (${rowCount}×${colCount}): ${displayName.replace('Table: ', '')}`;
+                        break;
+                    case 'list-item':
+                        const listType = nodeData.listType === 'ordered' ? '1.' : '-';
+                        displayName = `${listType} ${displayName}`;
+                        break;
+                    case 'checkbox':
+                        const checkIcon = nodeData.checked ? '[x]' : '[ ]';
+                        displayName = `${checkIcon} ${displayName}`;
+                        break;
+                    case 'math':
+                        displayName = `Math: ${displayName.replace('Math: ', '')}`;
+                        break;
+                    default:
+                        // No prefix for default content
+                        break;
+                }
+            }
+            
+            textElement.append("tspan")
+                .attr("x", nodeData.children ? -13 : 13)
+                .attr("dy", "0em")
+                .style("font-weight", "bold")
+                .text(displayName.length > CONSTANTS.MAX_TEXT_LENGTH ? 
+                    displayName.substring(0, CONSTANTS.MAX_TEXT_LENGTH - 3) + "..." : displayName);
+            
+            // Add content preview for special types (only for non-inline content)
+            if (!this._shouldRenderInlineContent(nodeData)) {
+                this._addContentPreview(textElement, nodeData, fontSize);
+            }
+        }
+
+        _addContentPreview(textElement, nodeData, fontSize) {
+            const detail = nodeData.detail || "";
+            
+            if (nodeData.contentType === 'code' && nodeData.content) {
+                this._addCodePreview(textElement, nodeData, fontSize);
+            } else if (nodeData.contentType === 'table' && nodeData.headers) {
+                this._addTablePreview(textElement, nodeData, fontSize);
+            } else if (nodeData.contentType === 'list' && nodeData.elements) {
+                this._addListPreview(textElement, nodeData, fontSize);
+            } else if (detail.trim()) {
+                this._addRegularContent(textElement, detail, fontSize, nodeData.children);
+            }
+        }
+
+        _addCodePreview(textElement, nodeData, fontSize) {
+            const content = nodeData.content || "";
+            const lines = content.split('\n').slice(0, 2); // Show first 2 lines
+            
+            lines.forEach((line, index) => {
+                if (line.trim()) {
+                    textElement.append("tspan")
+                        .attr("x", nodeData.children ? -13 : 13)
+                        .attr("dy", "1.2em")
+                        .style("font-size", `${fontSize - 2}px`)
+                        .style("font-family", "monospace")
+                        .style("fill", "#666")
+                        .text(line.length > 40 ? line.substring(0, 37) + "..." : line);
+                }
+            });
+            
+            if (content.split('\n').length > 2) {
+                textElement.append("tspan")
+                    .attr("x", nodeData.children ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 2}px`)
+                    .style("fill", "#999")
+                    .text("...");
+            }
+        }
+
+        _addTablePreview(textElement, nodeData, fontSize) {
+            if (nodeData.headers && nodeData.headers.length > 0) {
+                const headerText = nodeData.headers.slice(0, 3).join(" | ");
+                textElement.append("tspan")
+                    .attr("x", nodeData.children ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 2}px`)
+                    .style("font-weight", "bold")
+                    .style("fill", "#666")
+                    .text(headerText.length > 30 ? headerText.substring(0, 27) + "..." : headerText);
+            }
+            
+            if (nodeData.rows && nodeData.rows.length > 0) {
+                const firstRow = nodeData.rows[0].slice(0, 3).join(" | ");
+                textElement.append("tspan")
+                    .attr("x", nodeData.children ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 2}px`)
+                    .style("fill", "#666")
+                    .text(firstRow.length > 30 ? firstRow.substring(0, 27) + "..." : firstRow);
+            }
+        }
+
+        _addListPreview(textElement, nodeData, fontSize) {
+            if (nodeData.elements && nodeData.elements.length > 0) {
+                const previewItems = nodeData.elements.slice(0, 2);
+                previewItems.forEach(item => {
+                    const bullet = nodeData.listType === 'ordered' ? '1.' : '•';
+                    const itemText = item.content || item.text || '';
+                    textElement.append("tspan")
+                        .attr("x", nodeData.children ? -13 : 13)
+                        .attr("dy", "1.2em")
+                        .style("font-size", `${fontSize - 2}px`)
+                        .style("fill", "#666")
+                        .text(`${bullet} ${itemText.length > 25 ? itemText.substring(0, 22) + "..." : itemText}`);
+                });
+                
+                if (nodeData.elements.length > 2) {
+                    textElement.append("tspan")
+                        .attr("x", nodeData.children ? -13 : 13)
+                        .attr("dy", "1.2em")
+                        .style("font-size", `${fontSize - 2}px`)
+                        .style("fill", "#999")
+                        .text("...");
+                }
+            }
+        }
+
+        _addInlineCodeContent(nodeGroup, nodeData, yOffset, theme) {
+            // Extract content from elements array (new data structure)
+            let content = nodeData.content || "";
+            let language = nodeData.language || "";
+            
+            // Try to get content from elements array if direct properties don't exist
+            if (!content && nodeData.elements && nodeData.elements.length > 0) {
+                const codeElement = nodeData.elements.find(el => el.type === 'code-block');
+                if (codeElement) {
+                    content = codeElement.content || "";
+                    language = codeElement.language || "";
+                }
+            }
+            
+            // Extract language from node text if not found (e.g., "Code: js")
+            if (!language && nodeData.text) {
+                const langMatch = nodeData.text.match(/Code:\s*(\w+)/i);
+                if (langMatch) {
+                    language = langMatch[1];
+                }
+            }
+            
+            console.log(`Code content: "${content}", language: "${language}", from elements: ${!!nodeData.elements}`);
+            
+            if (!content.trim()) {
+                console.log(`No code content found, skipping render`);
+                return;
+            }
+            
+            const foreignObject = nodeGroup.append("foreignObject")
+                .attr("x", 15)  // Position right next to the node label
+                .attr("y", -12)  // Center vertically with the node
+                .attr("width", 400)
+                .attr("height", 30);
+            
+            const codeContainer = foreignObject.append("xhtml:div")
+                .style("font-family", "Monaco, 'Courier New', monospace")
+                .style("font-size", "14px")
+                .style("color", "#f8f8f2")
+                .style("padding", "4px 8px")
+                .style("background", "rgba(45, 45, 45, 0.9)")
+                .style("border-radius", "3px")
+                .style("white-space", "nowrap")
+                .style("display", "inline-block");
+            
+            // Basic syntax highlighting for JavaScript
+            if (language === 'js' || language === 'javascript') {
+                const highlightedCode = this._highlightJavaScript(content.trim());
+                codeContainer.html(highlightedCode);
+                console.log(`Applied JavaScript highlighting`);
+            } else {
+                codeContainer.text(content.trim());
+                console.log(`Applied plain text (language: ${language || 'none'})`);
+            }
+        }
+        
+        _addInlineTableContent(nodeGroup, childData, yOffset, theme) {
+            let headers = childData.headers || [];
+            let rows = childData.rows || [];
+            
+            // If no direct headers/rows, try to extract from elements array
+            if ((!headers.length || !rows.length) && childData.elements && childData.elements.length > 0) {
+                const cellElements = childData.elements.filter(el => el.type === 'cell');
+                if (cellElements.length >= 4) { // At least 2 headers + 2 data cells
+                    headers = [cellElements[0].content, cellElements[1].content];
+                    rows = [];
+                    // Group remaining cells into rows
+                    for (let i = 2; i < cellElements.length; i += 2) {
+                        if (i + 1 < cellElements.length) {
+                            rows.push([cellElements[i].content, cellElements[i + 1].content]);
+                        }
+                    }
+                }
+            }
+            
+            console.log(`Table headers: [${headers.join(', ')}], rows: ${rows.length}, from elements: ${!!childData.elements}`);
+            
+            const tableHeight = (rows.length + 1) * 22 + 10; // More compact
+            const foreignObject = nodeGroup.append("foreignObject")
+                .attr("x", 15)  // Position right next to the node label
+                .attr("y", -tableHeight/2)  // Center vertically
+                .attr("width", 150)
+                .attr("height", tableHeight);
+            
+            const tableContainer = foreignObject.append("xhtml:div");
+            
+            const table = tableContainer.append("table")
+                .style("border-collapse", "collapse")
+                .style("font-size", "11px")
+                .style("background", "white")
+                .style("border", "1px solid #333");
+            
+            // Add header row
+            if (headers.length > 0) {
+                const headerRow = table.append("thead").append("tr");
+                headers.forEach(header => {
+                    headerRow.append("th")
+                        .style("border", "1px solid #333")
+                        .style("padding", "3px 6px")
+                        .style("background", "#f0f0f0")
+                        .style("font-weight", "bold")
+                        .style("color", "black")
+                        .text(header);
+                });
+            }
+            
+            // Add data rows
+            if (rows.length > 0) {
+                const tbody = table.append("tbody");
+                rows.forEach(row => {
+                    const tableRow = tbody.append("tr");
+                    row.forEach(cell => {
+                        tableRow.append("td")
+                            .style("border", "1px solid #333")
+                            .style("padding", "3px 6px")
+                            .style("color", "black")
+                            .text(cell);
+                    });
+                });
+            }
+        }
+        
+        _addInlineParagraphContent(nodeGroup, childData, yOffset, theme) {
+            const content = childData.content || "";
+            
+            const foreignObject = nodeGroup.append("foreignObject")
+                .attr("x", 15)  // Position right next to the node label
+                .attr("y", -15)  // Center vertically with the node
+                .attr("width", 400)
+                .attr("height", 60);
+            
+            const paragraphContainer = foreignObject.append("xhtml:div")
+                .style("font-family", "system-ui, sans-serif")
+                .style("font-size", "12px")
+                .style("color", "#e0e0e0")  // Light grey for good readability
+                .style("padding", "4px 8px")
+                .style("background", "rgba(0, 0, 0, 0.3)")
+                .style("border-radius", "3px")
+                .style("line-height", "1.4")
+                .style("word-wrap", "break-word")
+                .style("overflow-wrap", "break-word");
+            
+            paragraphContainer.text(content);
+        }
+        
+        _addInlineLinkContent(nodeGroup, childData, yOffset, theme) {
+            let linkText = "";
+            let linkUrl = "";
+            
+            // Try to extract link data from elements array first (new data structure)
+            if (childData.elements && childData.elements.length > 0) {
+                const linkElement = childData.elements.find(el => el.type === 'link');
+                if (linkElement) {
+                    linkText = linkElement.text || "";
+                    linkUrl = linkElement.url || "";
+                }
+            }
+            
+            // Fallback: try to extract from text using regex
+            if (!linkText) {
+                const text = childData.name || childData.text || "";
+                const linkMatch = text.match(/\[(.+?)\]\((.+?)\)/);
+                if (linkMatch) {
+                    linkText = linkMatch[1];
+                    linkUrl = linkMatch[2];
+                } else {
+                    linkText = text.replace(/[\[\]]/g, ''); // Remove brackets if present
+                }
+            }
+            
+            console.log(`Link: "${linkText}" -> ${linkUrl}, from elements: ${!!childData.elements}`);
+            
+            const foreignObject = nodeGroup.append("foreignObject")
+                .attr("x", 15)  // Position right next to the node label
+                .attr("y", yOffset - 10)  // Offset for multiple links
+                .attr("width", 200)
+                .attr("height", 20);
+            
+            const linkContainer = foreignObject.append("xhtml:div")
+                .style("font-size", "12px")
+                .style("line-height", "20px");
+            
+            if (linkUrl) {
+                linkContainer.append("a")
+                    .attr("href", linkUrl)
+                    .attr("target", "_blank")
+                    .style("color", "#4fc3f7")  // Light blue for better visibility
+                    .style("text-decoration", "underline")
+                    .style("cursor", "pointer")
+                    .style("font-weight", "normal")
+                    .text(linkText);  // Only show the link text, not the URL
+            } else {
+                // No URL found, just display as styled text
+                linkContainer
+                    .style("color", "#4fc3f7")
+                    .style("text-decoration", "underline")
+                    .text(linkText);
+            }
+        }
+        
+        _highlightJavaScript(code) {
+            // Basic JavaScript syntax highlighting
+            let highlighted = code;
+            
+            // Keywords
+            highlighted = highlighted.replace(/\b(console|log|function|var|let|const|if|else|for|while|return)\b/g, '<span style="color: #66d9ef">$1</span>');
+            
+            // Strings
+            highlighted = highlighted.replace(/'([^']*)'/g, '<span style="color: #e6db74">\'$1\'</span>');
+            highlighted = highlighted.replace(/"([^"]*)"/g, '<span style="color: #e6db74">"$1"</span>');
+            
+            // Comments
+            highlighted = highlighted.replace(/\/\/.*$/gm, '<span style="color: #75715e">$&</span>');
+            
+            // Methods and properties
+            highlighted = highlighted.replace(/\.([a-zA-Z_][a-zA-Z0-9_]*)/g, '.<span style="color: #a6e22e">$1</span>');
+            
+            return highlighted;
+        }
+
+        _addCodeContent(textElement, detail, fontSize, hasChildren) {
+            const lines = detail.split('\n');
+            const firstLine = lines[0];
+            
+            if (firstLine.startsWith('```')) {
+                const language = firstLine.replace('```', '').trim();
+                if (language) {
+                    textElement.append("tspan")
+                        .attr("x", hasChildren ? -13 : 13)
+                        .attr("dy", "1.2em")
+                        .style("font-size", `${fontSize - 1}px`)
+                        .style("fill", "#10b981")
+                        .text(`Language: ${language}`);
+                }
+            }
+            
+            const codeLines = lines.slice(1, lines.length - 1);
+            const displayLines = codeLines.slice(0, 2);
+            displayLines.forEach(line => {
+                textElement.append("tspan")
+                    .attr("x", hasChildren ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 1}px`)
+                    .style("font-family", "monospace")
+                    .style("fill", "#666")
+                    .text(line.length > CONSTANTS.MAX_TEXT_LENGTH ? 
+                        line.substring(0, CONSTANTS.MAX_TEXT_LENGTH - 3) + "..." : line);
+            });
+            
+            if (codeLines.length > 2) {
+                textElement.append("tspan")
+                    .attr("x", hasChildren ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 1}px`)
+                    .style("fill", "#666")
+                    .text("...");
+            }
+        }
+
+        _addRegularContent(textElement, detail, fontSize, hasChildren) {
+            const detailLines = detail.split('\n').filter(line => line.trim()).slice(0, CONSTANTS.MAX_DETAIL_LINES);
+            detailLines.forEach(line => {
+                textElement.append("tspan")
+                    .attr("x", hasChildren ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 1}px`)
+                    .style("fill", "#666")
+                    .text(line.length > 30 ? line.substring(0, 27) + "..." : line);
+            });
+            
+            if (detail.split('\n').filter(line => line.trim()).length > CONSTANTS.MAX_DETAIL_LINES) {
+                textElement.append("tspan")
+                    .attr("x", hasChildren ? -13 : 13)
+                    .attr("dy", "1.2em")
+                    .style("font-size", `${fontSize - 1}px`)
+                    .style("fill", "#666")
+                    .text("...");
+            }
+        }
+
+        _addNodeInteractions(nodeGroup, d) {
+            nodeGroup
+                .on("mouseover", () => this._handleMouseOver(nodeGroup, d))
+                .on("mouseout", () => this._handleMouseOut(nodeGroup, d))
+                .on("click", (event) => this._handleClick(event, nodeGroup, d));
+        }
+
+        _handleMouseOver(nodeGroup, d) {
+            const styling = NodeStyleCalculator.calculateStyling(d.data);
+            this._animateNodeHover(nodeGroup, styling, true);
+        }
+
+        _handleMouseOut(nodeGroup, d) {
+            const styling = NodeStyleCalculator.calculateStyling(d.data);
+            this._animateNodeHover(nodeGroup, styling, false);
+        }
+
+        _animateNodeHover(nodeGroup, styling, isHover) {
+            const duration = CONSTANTS.ANIMATION_DURATION;
+            const scale = isHover ? 1.1 : 1;
+            const strokeWidth = isHover ? 3 : styling.strokeWidth;
+            
+            if (styling.shape === 'circle') {
+                nodeGroup.select("circle")
+                    .transition()
+                    .duration(duration)
+                    .attr("r", (styling.radius || 8) * scale)
+                    .style("stroke-width", strokeWidth);
+            } else if (styling.shape === 'rect' || styling.shape === 'roundedRect') {
+                nodeGroup.select("rect")
+                    .transition()
+                    .duration(duration)
+                    .style("stroke-width", strokeWidth)
+                    .style("filter", isHover ? "brightness(1.1)" : "none");
+            } else if (styling.shape === 'diamond') {
+                nodeGroup.select("polygon")
+                    .transition()
+                    .duration(duration)
+                    .style("stroke-width", strokeWidth)
+                    .style("filter", isHover ? "brightness(1.1)" : "none");
+            }
+        }
+
+        _handleClick(event, nodeGroup, d) {
+            event.stopPropagation();
+            
+            if (window.TreeInteraction?.TooltipManager) {
+                window.TreeInteraction.TooltipManager.hideAllTooltips();
+                window.TreeInteraction.TooltipManager.showTooltip(nodeGroup.node(), d.data, {
+                    showDelay: 0,
+                    maxWidth: 450,
+                    maxHeight: 350,
+                    allowInteraction: true
+                });
+            } else {
+                this.d3.selectAll(".mindmap-tooltip").remove();
+                this._showBasicTooltip(event, d.data);
+            }
+            
+            if (window.MindmapEvents && (d.data.detail || d.data.contentType || d.children?.length > 0)) {
+                window.MindmapEvents.emit('node:clicked', {
+                    nodeId: d.data.id || d.data.name || `node-${d.depth}`,
+                    nodeData: d.data,
+                    hasExpandableContent: true,
+                    position: { x: d.x, y: d.y }
+                });
+            }
+        }
+
+        _showBasicTooltip(event, data) {
+            const tooltip = this.d3.select('body')
+                .append('div')
+                .attr('class', 'mindmap-tooltip')
+                .style('position', 'absolute')
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY + 10}px`)
+                .style('background', 'white')
+                .style('border', '1px solid #ddd')
+                .style('border-radius', '4px')
+                .style('padding', '8px')
+                .style('font-size', '12px')
+                .style('max-width', '300px')
+                .style('z-index', '1000');
+            
+            tooltip.append('div')
+                .style('font-weight', 'bold')
+                .style('margin-bottom', '4px')
+                .text(data.name || data.text || '');
+            
+            if (data.detail) {
                 tooltip.append('div')
                     .style('white-space', 'pre-wrap')
                     .text(data.detail);
             }
+            
+            if (data.contentType && data.contentType !== 'text') {
+                tooltip.append('div')
+                    .style('margin-top', '4px')
+                    .style('font-style', 'italic')
+                    .style('color', '#666')
+                    .text(`Type: ${data.contentType}`);
+            }
         }
-        
-        // Add content type indicator
-        if (data.contentType && data.contentType !== 'text') {
-            tooltip.append('div')
-                .style('margin-top', '4px')
-                .style('font-style', 'italic')
-                .style('color', '#666')
-                .text(`Type: ${data.contentType}`);
+
+        _centerView(svg, g, width, height) {
+            const bounds = g.node().getBBox();
+            const centerX = bounds.x + bounds.width / 2;
+            const centerY = bounds.y + bounds.height / 2;
+            const scale = Math.min(width / bounds.width, height / bounds.height) * 0.8;
+            const translate = [width / 2 - scale * centerX, height / 2 - scale * centerY];
+            
+            const zoom = this.d3.zoom();
+            svg.call(zoom.transform, this.d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+        }
+
+        /**
+         * Main render method
+         */
+        render(data, container, options = {}) {
+            const theme = ThemeProvider.getCurrentTheme();
+            const { svg, width, height } = this.createSVG(container, options);
+            const nodes = this.renderTreeLayout(data, svg, width, height, theme);
+            
+            if (window.TreeInteraction?.D3Animations && !window.TreeInteraction.D3Animations.isInitialized) {
+                try {
+                    window.TreeInteraction.D3Animations.init(svg.node(), {
+                        respectReducedMotion: true,
+                        maxConcurrentAnimations: 10
+                    });
+                } catch (error) {
+                    console.warn('Failed to initialize D3 animations:', error);
+                }
+            }
+            
+            return svg.node();
         }
     }
 
-    /**
-     * Main render function - integrates parsing, layout, and visualization
-     * @param {TreeNode} root - Parsed tree structure
-     * @param {HTMLElement} container - Target container (optional, uses default if not provided)
-     * @param {Object} options - Rendering options from config
-     */
-    function renderMindmap(root, container = null, options = {}) {
-        // Use default container if not provided
-        if (!container) {
-            container = document.getElementById('mindmapContainer');
+    // Main Orchestrator Class - Coordinates all modules
+    class D3MindmapRenderer {
+        constructor(dependencies = {}) {
+            this.domRenderer = dependencies.domRenderer || new DOMRenderer();
+            this.dataTransformer = dependencies.dataTransformer || DataTransformer;
+            this.themeProvider = dependencies.themeProvider || ThemeProvider;
         }
-        
-        if (!container) {
-            throw new Error('Mindmap container not found');
+
+        /**
+         * Main render method that coordinates all modules
+         */
+        render(data, container, options = {}) {
+            try {
+                const transformedData = this.dataTransformer.transformToD3Format(data);
+                return this.domRenderer.render(transformedData, container, options);
+            } catch (error) {
+                this._handleRenderError(error, container);
+                throw error;
+            }
         }
-        console.log('-=-=-=-=-=3.1 root', root);
-        console.log('-=-=-=-=-=3.1', container);
-        try {
-            // Apply layout if LayoutEngine is available
-            if (window.TreeInteraction?.LayoutEngine) {
-                window.TreeInteraction.LayoutEngine.calculateLayout(root);
-            }
-            
-            // Transform data to d3 format
-            const d3Data = transformToD3Format(root);
-            console.log('Rendering mindmap with data:', d3Data);
-            
-            // Create mindmap
-            createD3Mindmap(d3Data, container, options);
-            
-            // Update node count if element exists
-            const nodeCountElement = document.getElementById('nodeCount');
-            if (nodeCountElement && root.getNodeCount) {
-                nodeCountElement.textContent = root.getNodeCount();
-            }
-            
-        } catch (error) {
+
+        _handleRenderError(error, container) {
             console.error('Error rendering mindmap:', error);
-            container.innerHTML = `<div class="flex items-center justify-center h-full text-gray-500">
-                <div class="text-center">
-                    <p>Unable to render mindmap</p>
-                    <p class="text-sm mt-2">${error.message}</p>
-                </div>
-            </div>`;
+            if (container) {
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-full text-gray-500">
+                        <div class="text-center">
+                            <p>Unable to render mindmap</p>
+                            <p class="text-sm mt-2">${error.message}</p>
+                        </div>
+                    </div>`;
+            }
         }
-    }
 
-    /**
-     * Update mindmap from markdown input
-     * @param {string} markdown - Markdown content
-     * @param {HTMLElement} container - Target container
-     */
-    function updateMindmapFromMarkdown(markdown, container = null) {
-        if (!markdown.trim()) {
+        /**
+         * Update mindmap from markdown input
+         */
+        updateMindmapFromMarkdown(markdown, container = null) {
+            if (!markdown.trim()) {
+                const targetContainer = container || document.getElementById('mindmapContainer');
+                if (targetContainer) {
+                    targetContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Enter markdown to see the mindmap</div>';
+                }
+                return;
+            }
+
             const targetContainer = container || document.getElementById('mindmapContainer');
-            if (targetContainer) {
-                targetContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Enter markdown to see the mindmap</div>';
+            
+            if (!targetContainer) {
+                console.error('Mindmap container element not found');
+                return;
             }
-            return;
-        }
-
-        try {
-            // Use parser if available
-            console.log('-=-=-=-=-=1 ');
-            if (window.MarkdownMindmap?.Parser?.parseMarkdownToTree) {
-                console.log('-=-=-=-=-=2 ');
-                // Enable filtering for cleaner mindmap visualization (matches target behavior)
-                const tree = window.MarkdownMindmap.Parser.parseMarkdownToTree(markdown, { 
-                    filterForMindmap: true 
-                });
-                renderMindmap(tree, container);
-            } else {
-                console.log('-=-=-=-=-=3 ');
-                throw new Error('Markdown parser not available');
+            
+            try {
+                if (window.MarkdownMindmap?.Parser?.parseMarkdownToTree) {
+                    const tree = window.MarkdownMindmap.Parser.parseMarkdownToTree(markdown);
+                    
+                    console.log('Parsed tree structure:', tree);
+                    
+                    // Debug specific nodes for inline content detection
+                    tree.children?.forEach((child, index) => {
+                        console.log(`Node ${index}: "${child.text || child.name}" (type: ${child.type}, contentType: ${child.contentType || 'none'})`);
+                        if (child.content) {
+                            console.log(`  Has content: ${child.content.substring(0, 50)}...`);
+                        }
+                        if (child.children && child.children.length > 0) {
+                            child.children.forEach((grandchild, gIndex) => {
+                                console.log(`  Child ${gIndex}: "${grandchild.text || grandchild.name}" (type: ${grandchild.type}, contentType: ${grandchild.contentType || 'none'})`);
+                            });
+                        }
+                    });
+                    this.render(tree, targetContainer);
+                } else {
+                    throw new Error('Markdown parser not available');
+                }
+            } catch (error) {
+                console.error('Error updating mindmap:', error);
+                this._handleRenderError(error, targetContainer);
             }
-        } catch (error) {
-            console.error('Error updating mindmap:', error);
         }
     }
 
-    // Create global namespace
+    // Factory for dependency injection and testing
+    const MindmapRendererFactory = {
+        create(overrides = {}) {
+            return new D3MindmapRenderer(overrides);
+        },
+
+        // For backward compatibility - legacy function wrappers
+        createD3Mindmap(data, container, options = {}) {
+            const renderer = this.create();
+            return renderer.domRenderer.render(data, container, options);
+        },
+
+        transformToD3Format(root) {
+            return DataTransformer.transformToD3Format(root);
+        },
+
+        renderMindmap(root, container = null, options = {}) {
+            const targetContainer = container || document.getElementById('mindmapContainer');
+            if (!targetContainer) {
+                throw new Error('Mindmap container not found');
+            }
+
+            try {
+                if (window.TreeInteraction?.LayoutEngine) {
+                    window.TreeInteraction.LayoutEngine.calculateLayout(root);
+                }
+                
+                const renderer = this.create();
+                renderer.render(root, targetContainer, options);
+                
+                const nodeCountElement = document.getElementById('nodeCount');
+                if (nodeCountElement && root.getNodeCount) {
+                    nodeCountElement.textContent = root.getNodeCount();
+                }
+            } catch (error) {
+                console.error('Error rendering mindmap:', error);
+                targetContainer.innerHTML = `<div class="flex items-center justify-center h-full text-gray-500">
+                    <div class="text-center">
+                        <p>Unable to render mindmap</p>
+                        <p class="text-sm mt-2">${error.message}</p>
+                    </div>
+                </div>`;
+            }
+        },
+
+        updateMindmapFromMarkdown(markdown, container = null) {
+            const renderer = this.create();
+            return renderer.updateMindmapFromMarkdown(markdown, container);
+        },
+
+        getNodeColor(level, theme = {}) {
+            return NodeStyleCalculator.getNodeColor(level, theme);
+        }
+    };
+
+    // Create global namespace with legacy API for backward compatibility
     if (typeof window !== 'undefined') {
         window.MarkdownMindmap = window.MarkdownMindmap || {};
         window.MarkdownMindmap.Renderer = {
-            createD3Mindmap,
-            transformToD3Format,
-            renderMindmap,
-            updateMindmapFromMarkdown,
-            getNodeColor
+            // New API
+            create: MindmapRendererFactory.create.bind(MindmapRendererFactory),
+            
+            // Legacy API for backward compatibility
+            createD3Mindmap: MindmapRendererFactory.createD3Mindmap.bind(MindmapRendererFactory),
+            transformToD3Format: MindmapRendererFactory.transformToD3Format.bind(MindmapRendererFactory),
+            renderMindmap: MindmapRendererFactory.renderMindmap.bind(MindmapRendererFactory),
+            updateMindmapFromMarkdown: MindmapRendererFactory.updateMindmapFromMarkdown.bind(MindmapRendererFactory),
+            getNodeColor: MindmapRendererFactory.getNodeColor.bind(MindmapRendererFactory)
         };
         
-        // Listen for theme changes and re-render the mindmap
+        // Theme change listener setup
         function registerThemeChangeListener() {
             if (window.MarkdownMindmap?.ThemeManager) {
-                // Register callback to update the mindmap when theme changes
-                window.MarkdownMindmap.ThemeManager.onThemeChange(function(themeName, themeData) {
-                    console.log('%c[2.1] Theme Change Callback → Received theme change event', 'background:#ff6600;color:white;padding:3px;font-weight:bold');
-                    console.log('  New theme:', themeName);
-                    console.log('  Theme data:', themeData);
+                window.MarkdownMindmap.ThemeManager.onThemeChange((themeName, themeData) => {
+                    console.log('%c[Theme Change] Received theme change event', 'background:#ff6600;color:white;padding:3px;font-weight:bold');
                     
-                    // Get the current markdown content
+                    ThemeProvider.invalidateCache();
+                    
                     const markdownInput = document.getElementById('markdownInput');
-                    if (markdownInput && markdownInput.value) {
-                        console.log('  Found markdown input with content length:', markdownInput.value.length);
-                        
-                        setTimeout(function() {
-                            // Re-render the mindmap with new theme after a slight delay
-                            // to ensure CSS variables have been applied
+                    if (markdownInput?.value) {
+                        setTimeout(() => {
                             const container = document.getElementById('mindmapContainer');
                             if (container) {
-                                console.log('  Found container element:', container.id);
-                                // Clean the container completely
                                 container.innerHTML = '';
-                                
-                                console.log('  Container cleared, starting redraw with theme:', themeName);
-                                
-                                // Check if CSS variables are properly set
-                                const style = getComputedStyle(document.documentElement);
-                                const accent = style.getPropertyValue('--theme-accent').trim();
-                                console.log('  Current CSS accent color variable:', accent || 'not set');
-                                
-                                // Force a complete reparse and redraw
                                 window.MarkdownMindmap.Renderer.updateMindmapFromMarkdown(
                                     markdownInput.value, 
                                     container
                                 );
-                            } else {
-                                console.error('  Container element not found');
                             }
-                        }, 200); // Increased delay to ensure CSS variables are fully applied
-                    } else {
-                        console.error('  Markdown input not found or empty');
+                        }, CONSTANTS.TOOLTIP_DELAY);
                     }
                 });
                 
                 console.log('%c[INIT] Theme change listener registered successfully', 'background:green;color:white;padding:3px');
             } else {
-                console.warn('%c[ERROR] ThemeManager not available to register theme change listener', 'background:red;color:white;padding:3px');
+                console.warn('%c[ERROR] ThemeManager not available', 'background:red;color:white;padding:3px');
             }
         }
         
-        // Register theme listener both immediately and on DOMContentLoaded
+        // Register theme listener
         registerThemeChangeListener();
         document.addEventListener('DOMContentLoaded', registerThemeChangeListener);
     }
     
-    // Export for module systems if available
+    // Export for module systems
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
-            createD3Mindmap,
-            transformToD3Format,
-            renderMindmap,
-            updateMindmapFromMarkdown,
-            getNodeColor
+            D3MindmapRenderer,
+            MindmapRendererFactory,
+            DOMRenderer,
+            DataTransformer,
+            NodeStyleCalculator,
+            ColorUtils,
+            ThemeProvider,
+            
+            // Legacy exports
+            createD3Mindmap: MindmapRendererFactory.createD3Mindmap,
+            transformToD3Format: MindmapRendererFactory.transformToD3Format,
+            renderMindmap: MindmapRendererFactory.renderMindmap,
+            updateMindmapFromMarkdown: MindmapRendererFactory.updateMindmapFromMarkdown,
+            getNodeColor: MindmapRendererFactory.getNodeColor
         };
     }
+
 })();
