@@ -818,10 +818,12 @@
   color: var(--color-text-primary);
   border-right: 1px solid var(--color-border);
   position: relative;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
 .table-header-cell:last-child {
@@ -892,11 +894,13 @@
   border-right: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
   vertical-align: top;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
 .table-cell:last-child {
@@ -1013,20 +1017,70 @@
   }
 }
 
-/* Table Container for Node Display */
-.mindmap-node-table {
-  max-width: 400px;
-  max-height: 300px;
+/* Table Container for Node Display - Enhanced */
+.mindmap-table-container {
+  max-width: 300px;
+  max-height: 200px;
   overflow: auto;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background-color: var(--color-surface);
   box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  position: relative;
+  font-size: var(--font-size-xs);
 }
 
-.mindmap-node-table .mindmap-table {
+.mindmap-table-container:hover {
+  box-shadow: var(--shadow-xl);
+  border-color: var(--color-primary);
+}
+
+.mindmap-table-container .mindmap-table {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
+  font-size: var(--font-size-sm);
+}
+
+.mindmap-table-container .table-header-cell {
+  padding: var(--spacing-1);
+  font-size: 10px;
+  font-weight: 600;
+  background-color: var(--color-primary);
+  color: white;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.mindmap-table-container .table-cell {
+  padding: var(--spacing-0-5) var(--spacing-1);
+  font-size: 10px;
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Table type indicator */
+.mindmap-table-container::before {
+  content: '📊';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--color-primary);
+  color: white;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  z-index: 1;
 }
 
 /* Table Loading State */
@@ -1163,25 +1217,74 @@
   }
 }
 /* ======================
-   CODE BLOCK DISPLAY COMPONENT
+   CODE BLOCK DISPLAY COMPONENT - ENHANCED
    ====================== */
 
 .mindmap-code-block {
   position: relative;
-  margin: 0.5rem 0;
-  background-color: var(--color-surface-dark, #2d2d2d);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--color-border-dark, #444);
+  margin: 0.25rem 0;
+  background-color: var(--color-surface-dark, #1e1e2e);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-dark, #10b981);
   overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', monospace);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
+  max-width: 280px;
+  max-height: 160px;
+}
+
+.mindmap-code-block:hover {
+  border-color: var(--color-success, #10b981);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Code type indicator */
+.mindmap-code-block::before {
+  content: '</>';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--color-success, #10b981);
+  color: white;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  font-size: 8px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  z-index: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .mindmap-code-block pre {
   margin: 0;
-  padding: 1rem;
+  padding: 0.5rem 0.75rem;
   overflow-x: auto;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2a2a40 100%);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-success, #10b981) transparent;
+  max-height: 120px;
+}
+
+.mindmap-code-block pre::-webkit-scrollbar {
+  height: 6px;
+}
+
+.mindmap-code-block pre::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.mindmap-code-block pre::-webkit-scrollbar-thumb {
+  background: var(--color-success, #10b981);
+  border-radius: 3px;
+}
+
+.mindmap-code-block pre::-webkit-scrollbar-thumb:hover {
+  background: var(--color-success-dark, #059669);
 }
 
 .mindmap-code-block.with-line-numbers pre {
@@ -1425,99 +1528,260 @@
 }
 
 /* ======================
-   ENHANCED NODE TYPES (T016)
+   ENHANCED NODE TYPES (T016) - IMPROVED UI/UX
    ====================== */
 
-/* Multi-node type SVG styling */
-.mindmap-node-text {
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+/* Base node styling with improved hierarchy */
+.mindmap-node {
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Text nodes - Standard styling */
+.mindmap-node-text {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.12));
+  stroke-width: 2px;
+  stroke: var(--color-border, #e5e7eb);
+  fill: var(--color-surface, #ffffff);
+}
+
+.mindmap-node-text:hover {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.18));
+  transform: scale(1.02);
+  stroke: var(--color-primary, #3b82f6);
+}
+
+/* Table nodes - Enhanced visual differentiation */
 .mindmap-node-table {
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 3px 10px rgba(59, 130, 246, 0.25));
+  stroke-width: 2.5px;
+  stroke: #3b82f6;
+  fill: #f0f9ff;
+  rx: 8;
 }
 
 .mindmap-node-table:hover {
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2)) brightness(1.1);
+  filter: drop-shadow(0 6px 16px rgba(59, 130, 246, 0.35));
+  transform: scale(1.03);
+  stroke: #1d4ed8;
+  fill: #dbeafe;
 }
 
+/* Code block nodes - Technical appearance */
 .mindmap-node-code {
-  filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.3));
+  filter: drop-shadow(0 3px 10px rgba(16, 185, 129, 0.3));
+  stroke-width: 2px;
+  stroke: #10b981;
+  fill: #f0fdf4;
+  rx: 6;
+  stroke-dasharray: 3,2;
 }
 
 .mindmap-node-code:hover {
-  filter: drop-shadow(0 4px 8px rgba(16, 185, 129, 0.4)) brightness(1.1);
+  filter: drop-shadow(0 6px 16px rgba(16, 185, 129, 0.4));
+  transform: scale(1.03);
+  stroke: #059669;
+  fill: #dcfce7;
+  stroke-dasharray: none;
 }
 
+/* List nodes - Organized appearance */
 .mindmap-node-list {
-  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3));
+  filter: drop-shadow(0 3px 10px rgba(245, 158, 11, 0.3));
+  stroke-width: 2px;
+  stroke: #f59e0b;
+  fill: #fffbeb;
+  rx: 4;
 }
 
 .mindmap-node-list:hover {
-  filter: drop-shadow(0 4px 8px rgba(245, 158, 11, 0.4)) brightness(1.1);
+  filter: drop-shadow(0 6px 16px rgba(245, 158, 11, 0.4));
+  transform: scale(1.03);
+  stroke: #d97706;
+  fill: #fef3c7;
 }
 
-/* Node content indicators */
+/* Node text styling with better typography */
+.mindmap-node text {
+  font-family: var(--font-family-base, system-ui, sans-serif);
+  font-weight: 500;
+  font-size: 14px;
+  fill: var(--color-text-primary, #1f2937);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mindmap-node-code text {
+  font-family: var(--font-family-mono, 'SF Mono', 'Monaco', monospace);
+  font-weight: 600;
+  font-size: 13px;
+  fill: #065f46;
+}
+
+.mindmap-node-table text {
+  font-weight: 600;
+  fill: #1e40af;
+}
+
+.mindmap-node-list text {
+  font-weight: 500;
+  fill: #92400e;
+}
+
+/* Node content indicators with improved visibility */
 .node-icon {
   font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  font-size: 16px;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.8;
+}
+
+.table-indicator {
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  fill: #1e40af;
   pointer-events: none;
   user-select: none;
 }
 
-.table-indicator,
-.code-indicator,
-.list-indicator {
-  font-family: system-ui, sans-serif;
-  font-weight: 500;
+.code-indicator {
+  font-family: var(--font-family-mono, monospace);
+  font-weight: 600;
+  font-size: 11px;
+  fill: #065f46;
   pointer-events: none;
   user-select: none;
+}
+
+.list-indicator {
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  fill: #92400e;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Enhanced connection lines */
+.mindmap-connection {
+  stroke: var(--color-border, #d1d5db);
+  stroke-width: 2px;
+  fill: none;
+  transition: stroke-width 0.3s ease;
+}
+
+.mindmap-connection:hover,
+.mindmap-node:hover ~ .mindmap-connection {
+  stroke: var(--color-primary, #3b82f6);
+  stroke-width: 3px;
 }
 
 /* Enhanced tooltips for different node types */
 .mindmap-tooltip {
-  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
-  line-height: 1.4;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-primary, #1f2937);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  max-width: 320px;
+  z-index: 1000;
 }
 
-/* Node type animations */
+.mindmap-tooltip.table-tooltip {
+  border-left: 4px solid #3b82f6;
+}
+
+.mindmap-tooltip.code-tooltip {
+  border-left: 4px solid #10b981;
+  font-family: var(--font-family-mono, monospace);
+  font-size: 13px;
+}
+
+.mindmap-tooltip.list-tooltip {
+  border-left: 4px solid #f59e0b;
+}
+
+/* Node type animations with improved easing */
 @keyframes nodeTypeGlow {
-  0% { filter: brightness(1); }
-  50% { filter: brightness(1.2); }
-  100% { filter: brightness(1); }
+  0% { 
+    filter: brightness(1) saturate(1);
+    transform: scale(1);
+  }
+  50% { 
+    filter: brightness(1.1) saturate(1.2);
+    transform: scale(1.02);
+  }
+  100% { 
+    filter: brightness(1) saturate(1);
+    transform: scale(1);
+  }
 }
 
 .mindmap-node-table.active,
 .mindmap-node-code.active,
 .mindmap-node-list.active {
-  animation: nodeTypeGlow 1s ease-in-out;
+  animation: nodeTypeGlow 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Accessibility enhancements for node shapes */
+/* Focus states for keyboard navigation */
+.mindmap-node:focus {
+  outline: 2px solid var(--color-focus-ring, #3b82f6);
+  outline-offset: 4px;
+}
+
+/* Accessibility enhancements */
 @media (prefers-reduced-motion: reduce) {
+  .mindmap-node,
   .mindmap-node-text,
   .mindmap-node-table, 
   .mindmap-node-code,
-  .mindmap-node-list {
+  .mindmap-node-list,
+  .mindmap-connection {
     transition: none !important;
     animation: none !important;
+    transform: none !important;
   }
 }
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-  .mindmap-node-table {
+  .mindmap-node-text {
     stroke: #000 !important;
     stroke-width: 3px !important;
+    fill: #fff !important;
+  }
+  
+  .mindmap-node-table {
+    stroke: #000 !important;
+    stroke-width: 4px !important;
+    fill: #fff !important;
   }
   
   .mindmap-node-code {
     stroke: #000 !important;
-    stroke-width: 3px !important;
+    stroke-width: 4px !important;
+    fill: #fff !important;
   }
   
   .mindmap-node-list {
     stroke: #000 !important;
-    stroke-width: 3px !important;
+    stroke-width: 4px !important;
+    fill: #fff !important;
+  }
+  
+  .mindmap-node text {
+    fill: #000 !important;
+    font-weight: 700 !important;
   }
   
   .table-indicator,
@@ -1526,4 +1790,60 @@
     fill: #000 !important;
     color: #000 !important;
   }
+  
+  .mindmap-connection {
+    stroke: #000 !important;
+    stroke-width: 3px !important;
+  }
+}
+
+/* Dark mode adjustments */
+.dark .mindmap-node-text {
+  stroke: var(--color-border-dark, #374151);
+  fill: var(--color-surface-dark, #1f2937);
+}
+
+.dark .mindmap-node-text:hover {
+  stroke: var(--color-primary-dark, #60a5fa);
+}
+
+.dark .mindmap-node-table {
+  fill: #1e3a8a;
+  stroke: #3b82f6;
+}
+
+.dark .mindmap-node-table:hover {
+  fill: #1e40af;
+}
+
+.dark .mindmap-node-code {
+  fill: #064e3b;
+  stroke: #10b981;
+}
+
+.dark .mindmap-node-code:hover {
+  fill: #065f46;
+}
+
+.dark .mindmap-node-list {
+  fill: #78350f;
+  stroke: #f59e0b;
+}
+
+.dark .mindmap-node-list:hover {
+  fill: #92400e;
+}
+
+.dark .mindmap-node text {
+  fill: var(--color-text-primary-dark, #f9fafb);
+}
+
+.dark .mindmap-connection {
+  stroke: var(--color-border-dark, #4b5563);
+}
+
+.dark .mindmap-tooltip {
+  background: var(--color-surface-dark, #1f2937);
+  border-color: var(--color-border-dark, #4b5563);
+  color: var(--color-text-primary-dark, #f9fafb);
 }

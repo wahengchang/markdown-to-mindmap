@@ -14,12 +14,14 @@
         DEFAULT_WIDTH: 800,
         DEFAULT_HEIGHT: 600,
         ZOOM_EXTENT: [0.1, 4],
+        MIN_AUTO_SCALE: 0.5,
+        MAX_AUTO_SCALE: 1.2,
         LAYOUT_PADDING: 80,
         LAYOUT_MARGIN: 160,
         ANIMATION_DURATION: 200,
         TOOLTIP_DELAY: 200,
-        MAX_TEXT_LENGTH: 25,
-        MAX_DETAIL_LINES: 3
+        MAX_TEXT_LENGTH: 50,
+        MAX_DETAIL_LINES: 4
     };
 
     const DEFAULT_COLORS = [
@@ -47,6 +49,67 @@
     };
 
     // Pure Logic Layer - No Browser Dependencies
+    
+    // Text wrapping utility
+    const TextUtils = {
+        /**
+         * Wrap text to fit within specified length, breaking at word boundaries
+         * @param {string} text - Text to wrap
+         * @param {number} maxLength - Maximum line length
+         * @returns {Object} Object with lines array and truncated flag
+         */
+        wrapText(text, maxLength = 50) {
+            if (!text || text.length <= maxLength) {
+                return { lines: [text], truncated: false };
+            }
+            
+            const words = text.split(/\s+/);
+            const lines = [];
+            let currentLine = '';
+            
+            for (const word of words) {
+                const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                
+                if (testLine.length <= maxLength) {
+                    currentLine = testLine;
+                } else {
+                    if (currentLine) {
+                        lines.push(currentLine);
+                    }
+                    
+                    // If a single word is longer than maxLength, truncate it
+                    if (word.length > maxLength) {
+                        lines.push(word.substring(0, maxLength - 3) + '...');
+                        currentLine = '';
+                    } else {
+                        currentLine = word;
+                    }
+                }
+                
+                // Limit to 2 lines for nodes
+                if (lines.length >= 2) {
+                    if (currentLine) {
+                        lines.push(currentLine.length > maxLength ? 
+                            currentLine.substring(0, maxLength - 3) + '...' : currentLine);
+                    }
+                    break;
+                }
+            }
+            
+            if (currentLine && lines.length < 2) {
+                lines.push(currentLine);
+            }
+            
+            const hasMoreWords = words.length > words.findIndex(word => 
+                lines.join(' ').includes(word)) + lines.join(' ').split(' ').length;
+            
+            return { 
+                lines: lines.slice(0, 2), 
+                truncated: hasMoreWords || text.length > lines.join(' ').length 
+            };
+        }
+    };
+    
     const ColorUtils = {
         /**
          * Shift hue of a hex color
@@ -370,10 +433,16 @@
         }
 
         _addZoomBehavior(svg) {
+            // Clear any existing zoom behavior to prevent multiple attachments
+            svg.on('.zoom', null);
+            
             const zoom = this.d3.zoom()
                 .scaleExtent(CONSTANTS.ZOOM_EXTENT)
                 .on("zoom", (event) => {
-                    svg.select(".main-group").attr("transform", event.transform);
+                    const mainGroup = svg.select(".main-group");
+                    if (!mainGroup.empty()) {
+                        mainGroup.attr("transform", event.transform);
+                    }
                 });
             
             svg.call(zoom);
@@ -397,13 +466,30 @@
         renderTreeLayout(data, svg, width, height, theme) {
             const g = svg.append("g").attr("class", "main-group");
             
-            const tree = this.d3.tree().size([height - CONSTANTS.LAYOUT_MARGIN, width - CONSTANTS.LAYOUT_MARGIN]);
+            // Enhanced tree layout with proper centering considerations
+            const tree = this.d3.tree()
+                .nodeSize([80, 180]) // Slightly tighter spacing for better fit
+                .separation((a, b) => {
+                    // Dynamic separation based on node types and tree depth
+                    const baseSeparation = a.parent === b.parent ? 1.0 : 1.3;
+                    
+                    // Reduce separation for deeper nodes to prevent excessive spread
+                    const depthFactor = Math.max(0.8, 1 - (a.depth * 0.1));
+                    
+                    return baseSeparation * depthFactor;
+                });
+                
             const root = this.d3.hierarchy(data);
             tree(root);
             
+            // Pre-process layout for better centering
+            this._preprocessLayoutForCentering(root);
+            
             this._renderLinks(g, root);
             const nodes = this._renderNodes(g, root, theme);
-            this._centerView(svg, g, width, height);
+            
+            // Enhanced centering with multiple strategies
+            this._centerViewEnhanced(svg, g, width, height, root);
             
             return nodes;
         }
@@ -666,12 +752,24 @@
                 }
             }
             
-            textElement.append("tspan")
-                .attr("x", nodeData.children ? -13 : 13)
-                .attr("dy", "0em")
-                .style("font-weight", "bold")
-                .text(displayName.length > CONSTANTS.MAX_TEXT_LENGTH ? 
-                    displayName.substring(0, CONSTANTS.MAX_TEXT_LENGTH - 3) + "..." : displayName);
+            // Smart text wrapping - break at word boundaries when possible
+            const wrappedName = this._wrapText(displayName, CONSTANTS.MAX_TEXT_LENGTH);
+            if (wrappedName.lines.length === 1) {
+                textElement.append("tspan")
+                    .attr("x", nodeData.children ? -13 : 13)
+                    .attr("dy", "0em")
+                    .style("font-weight", "bold")
+                    .text(wrappedName.lines[0]);
+            } else {
+                // Multi-line text
+                wrappedName.lines.forEach((line, index) => {
+                    textElement.append("tspan")
+                        .attr("x", nodeData.children ? -13 : 13)
+                        .attr("dy", index === 0 ? "0em" : "1.2em")
+                        .style("font-weight", "bold")
+                        .text(line);
+                });
+            }
             
             // Add content preview for special types (only for non-inline content)
             if (!this._shouldRenderInlineContent(nodeData)) {
@@ -1029,12 +1127,15 @@
         _addRegularContent(textElement, detail, fontSize, hasChildren) {
             const detailLines = detail.split('\n').filter(line => line.trim()).slice(0, CONSTANTS.MAX_DETAIL_LINES);
             detailLines.forEach(line => {
-                textElement.append("tspan")
-                    .attr("x", hasChildren ? -13 : 13)
-                    .attr("dy", "1.2em")
-                    .style("font-size", `${fontSize - 1}px`)
-                    .style("fill", "#666")
-                    .text(line.length > 30 ? line.substring(0, 27) + "..." : line);
+                const wrappedLine = TextUtils.wrapText(line, 35);
+                wrappedLine.lines.forEach((wrappedText, lineIndex) => {
+                    textElement.append("tspan")
+                        .attr("x", hasChildren ? -13 : 13)
+                        .attr("dy", "1.2em")
+                        .style("font-size", `${fontSize - 1}px`)
+                        .style("fill", "#666")
+                        .text(wrappedText + (wrappedLine.truncated && lineIndex === wrappedLine.lines.length - 1 ? "..." : ""));
+                });
             });
             
             if (detail.split('\n').filter(line => line.trim()).length > CONSTANTS.MAX_DETAIL_LINES) {
@@ -1045,6 +1146,46 @@
                     .style("fill", "#666")
                     .text("...");
             }
+        }
+        
+        /**
+         * Wrapper method to access TextUtils.wrapText
+         */
+        _wrapText(text, maxLength = CONSTANTS.MAX_TEXT_LENGTH) {
+            return TextUtils.wrapText(text, maxLength);
+        }
+        
+        /**
+         * DISABLED: Preprocess layout to optimize for centering
+         * This was interfering with the coordinate calculations
+         */
+        _preprocessLayoutForCentering(root) {
+            // TEMPORARILY DISABLED - Let SVG handle natural coordinates
+            // The centering should happen purely in the transform, not by moving the nodes
+            
+            const descendants = root.descendants();
+            console.log(`🔍 LAYOUT INFO: ${descendants.length} nodes positioned by D3 tree algorithm`);
+            
+            // Log the natural layout bounds for debugging
+            const xCoords = descendants.map(d => d.y); // D3 tree: y = horizontal
+            const yCoords = descendants.map(d => d.x); // D3 tree: x = vertical
+            
+            const minX = Math.min(...xCoords);
+            const maxX = Math.max(...xCoords);
+            const minY = Math.min(...yCoords);
+            const maxY = Math.max(...yCoords);
+            
+            console.log(`🔍 NATURAL LAYOUT BOUNDS:`);
+            console.log(`  X (horizontal): ${minX.toFixed(1)} to ${maxX.toFixed(1)} (range: ${(maxX - minX).toFixed(1)})`);
+            console.log(`  Y (vertical): ${minY.toFixed(1)} to ${maxY.toFixed(1)} (range: ${(maxY - minY).toFixed(1)})`);
+            
+            // Find root node position
+            const rootNode = descendants.find(d => d.depth === 0);
+            if (rootNode) {
+                console.log(`🌳 ROOT NODE position: (${rootNode.y.toFixed(1)}, ${rootNode.x.toFixed(1)}) [D3 coordinates: y=horizontal, x=vertical]`);
+            }
+            
+            // DO NOT modify coordinates here - let the transform handle centering
         }
 
         _addNodeInteractions(nodeGroup, d) {
@@ -1152,14 +1293,137 @@
         }
 
         _centerView(svg, g, width, height) {
-            const bounds = g.node().getBBox();
-            const centerX = bounds.x + bounds.width / 2;
-            const centerY = bounds.y + bounds.height / 2;
-            const scale = Math.min(width / bounds.width, height / bounds.height) * 0.8;
-            const translate = [width / 2 - scale * centerX, height / 2 - scale * centerY];
-            
+            // Legacy method - now calls enhanced version
+            this._centerViewEnhanced(svg, g, width, height, null);
+        }
+        
+        /**
+         * CORRECTED centering algorithm with proper D3 coordinate system handling
+         */
+        _centerViewEnhanced(svg, g, width, height, root = null) {
+            try {
+                // Wait for DOM to be ready
+                setTimeout(() => {
+                    const bounds = g.node().getBBox();
+                    
+                    // Handle empty or invalid bounds
+                    if (!bounds || bounds.width === 0 || bounds.height === 0) {
+                        console.warn('Invalid bounds for centering view, applying fallback');
+                        this._applyFallbackCentering(svg, width, height);
+                        return;
+                    }
+                    
+                    console.log(`🔍 DEBUGGING - Original bounds: x=${bounds.x}, y=${bounds.y}, w=${bounds.width}, h=${bounds.height}`);
+                    console.log(`🔍 DEBUGGING - Viewport: ${width}x${height}`);
+                    
+                    // Enhanced padding calculation based on viewport size
+                    const padding = Math.min(60, Math.min(width, height) * 0.08);
+                    const viewWidth = width - (padding * 2);
+                    const viewHeight = height - (padding * 2);
+                    
+                    // Multi-strategy scale calculation
+                    const scaleX = viewWidth / bounds.width;
+                    const scaleY = viewHeight / bounds.height;
+                    let scale = Math.min(scaleX, scaleY);
+                    
+                    // Enhanced scale constraints with dynamic ranges
+                    const minScale = Math.max(0.3, Math.min(0.6, viewWidth / 1000));
+                    const maxScale = Math.min(1.5, Math.max(0.8, viewWidth / 500));
+                    
+                    scale = Math.max(minScale, Math.min(maxScale, scale));
+                    
+                    // CORRECTED: Calculate precise center points for SVG coordinate system
+                    const contentCenterX = bounds.x + bounds.width / 2;
+                    const contentCenterY = bounds.y + bounds.height / 2;
+                    
+                    // CORRECTED: Calculate viewport center
+                    const viewportCenterX = width / 2;
+                    const viewportCenterY = height / 2;
+                    
+                    // CORRECTED: Translation to center content in viewport
+                    // Formula: viewport_center - (scale * content_center)
+                    const translateX = viewportCenterX - (scale * contentCenterX);
+                    const translateY = viewportCenterY - (scale * contentCenterY);
+                    
+                    console.log(`🎯 CENTERING CALCULATION:`);
+                    console.log(`  Content center: (${contentCenterX.toFixed(1)}, ${contentCenterY.toFixed(1)})`);
+                    console.log(`  Viewport center: (${viewportCenterX.toFixed(1)}, ${viewportCenterY.toFixed(1)})`);
+                    console.log(`  Scale: ${scale.toFixed(3)}`);
+                    console.log(`  Scaled content center: (${(scale * contentCenterX).toFixed(1)}, ${(scale * contentCenterY).toFixed(1)})`);
+                    console.log(`  Required translation: (${translateX.toFixed(1)}, ${translateY.toFixed(1)})`);
+                    
+                    // Apply transformation
+                    const zoom = this.d3.zoom();
+                    const transform = this.d3.zoomIdentity
+                        .translate(translateX, translateY)
+                        .scale(scale);
+                    
+                    // Apply immediately without transition for debugging
+                    svg.call(zoom.transform, transform);
+                    
+                    // Update UI feedback
+                    this._updateZoomDisplay(scale);
+                    
+                    console.log(`✅ CORRECTED centering applied successfully!`);
+                    
+                    // Validate the result
+                    setTimeout(() => {
+                        const newBounds = g.node().getBBox();
+                        console.log(`🔍 POST-TRANSFORM bounds: x=${newBounds.x}, y=${newBounds.y}, w=${newBounds.width}, h=${newBounds.height}`);
+                        
+                        const currentTransform = this.d3.zoomTransform(svg.node());
+                        console.log(`🔍 CURRENT transform: translate(${currentTransform.x}, ${currentTransform.y}) scale(${currentTransform.k})`);
+                        
+                        // Calculate where content center should be after transform
+                        const transformedCenterX = currentTransform.x + (currentTransform.k * contentCenterX);
+                        const transformedCenterY = currentTransform.y + (currentTransform.k * contentCenterY);
+                        console.log(`🎯 Content center after transform: (${transformedCenterX.toFixed(1)}, ${transformedCenterY.toFixed(1)})`);
+                        console.log(`🎯 Should match viewport center: (${viewportCenterX}, ${viewportCenterY})`);
+                    }, 100);
+                    
+                }, 50);
+                
+            } catch (error) {
+                console.error('Error in corrected centering:', error);
+                this._applyFallbackCentering(svg, width, height);
+            }
+        }
+        
+        /**
+         * Fallback centering when normal calculation fails
+         */
+        _applyFallbackCentering(svg, width, height) {
+            console.log('Applying fallback centering');
             const zoom = this.d3.zoom();
-            svg.call(zoom.transform, this.d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+            const fallbackScale = 0.7;
+            const transform = this.d3.zoomIdentity
+                .translate(width / 2, height / 2)
+                .scale(fallbackScale);
+                
+            svg.call(zoom.transform, transform);
+            this._updateZoomDisplay(fallbackScale);
+        }
+        
+        /**
+         * Update zoom level display in UI
+         */
+        _updateZoomDisplay(scale) {
+            try {
+                const zoomPercentage = Math.round(scale * 100);
+                const zoomElement = document.getElementById('zoomLevel');
+                if (zoomElement) {
+                    zoomElement.textContent = `${zoomPercentage}%`;
+                }
+                
+                // Also trigger metric update if UIComponents is available
+                if (window.MarkdownMindmap?.UIComponents?.updateMetrics) {
+                    window.MarkdownMindmap.UIComponents.updateMetrics({
+                        zoomLevel: zoomPercentage
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not update zoom display:', error);
+            }
         }
 
         /**
@@ -1168,8 +1432,11 @@
         render(data, container, options = {}) {
             const theme = ThemeProvider.getCurrentTheme();
             const { svg, width, height } = this.createSVG(container, options);
+            
+            // Render the tree layout
             const nodes = this.renderTreeLayout(data, svg, width, height, theme);
             
+            // Initialize animations if available
             if (window.TreeInteraction?.D3Animations && !window.TreeInteraction.D3Animations.isInitialized) {
                 try {
                     window.TreeInteraction.D3Animations.init(svg.node(), {
@@ -1180,6 +1447,15 @@
                     console.warn('Failed to initialize D3 animations:', error);
                 }
             }
+            
+            // Ensure proper centering after render is complete
+            setTimeout(() => {
+                console.log('Post-render centering check...');
+                const mainGroup = svg.select('.main-group');
+                if (!mainGroup.empty()) {
+                    this._centerViewEnhanced(svg, mainGroup, width, height);
+                }
+            }, 100);
             
             return svg.node();
         }
@@ -1237,6 +1513,10 @@
                 console.error('Mindmap container element not found');
                 return;
             }
+            
+            // CRITICAL FIX: Always clear the container before rendering, just like theme change does
+            console.log('🧹 Clearing container before render...');
+            targetContainer.innerHTML = '';
             
             try {
                 if (window.MarkdownMindmap?.Parser?.parseMarkdownToTree) {
@@ -1366,9 +1646,112 @@
             }
         }
         
+        // Zoom event listener setup
+        function registerZoomEventListeners() {
+            // Listen for zoom events from UI components
+            document.addEventListener('zoom', (event) => {
+                const action = event.detail;
+                const container = document.getElementById('mindmapContainer');
+                if (!container) return;
+                
+                const svg = d3.select(container).select('svg');
+                if (svg.empty()) return;
+                
+                const zoom = d3.zoom();
+                const currentTransform = d3.zoomTransform(svg.node());
+                
+                let newTransform;
+                switch (action) {
+                    case 'in':
+                        newTransform = currentTransform.scale(1.2);
+                        break;
+                    case 'out':
+                        newTransform = currentTransform.scale(0.8);
+                        break;
+                    case 'reset':
+                    case 'fit':
+                        // CORRECTED fit-to-view using the fixed centering algorithm
+                        const mainGroup = svg.select('.main-group');
+                        if (!mainGroup.empty()) {
+                            const bounds = mainGroup.node().getBBox();
+                            const containerRect = container.getBoundingClientRect();
+                            const width = containerRect.width;
+                            const height = containerRect.height;
+                            
+                            console.log(`🔄 MANUAL FIT-TO-VIEW: bounds=(${bounds.x}, ${bounds.y}, ${bounds.width}, ${bounds.height})`);
+                            
+                            // Use corrected centering logic
+                            const padding = Math.min(60, Math.min(width, height) * 0.08);
+                            const viewWidth = width - (padding * 2);
+                            const viewHeight = height - (padding * 2);
+                            
+                            const scaleX = viewWidth / bounds.width;
+                            const scaleY = viewHeight / bounds.height;
+                            let scale = Math.min(scaleX, scaleY);
+                            
+                            // Dynamic scale constraints
+                            const minScale = Math.max(0.3, Math.min(0.6, viewWidth / 1000));
+                            const maxScale = Math.min(1.5, Math.max(0.8, viewWidth / 500));
+                            scale = Math.max(minScale, Math.min(maxScale, scale));
+                            
+                            // CORRECTED: Proper center calculation
+                            const contentCenterX = bounds.x + bounds.width / 2;
+                            const contentCenterY = bounds.y + bounds.height / 2;
+                            const viewportCenterX = width / 2;
+                            const viewportCenterY = height / 2;
+                            
+                            // CORRECTED: Proper translation calculation
+                            const translateX = viewportCenterX - (scale * contentCenterX);
+                            const translateY = viewportCenterY - (scale * contentCenterY);
+                            
+                            newTransform = d3.zoomIdentity
+                                .translate(translateX, translateY)
+                                .scale(scale);
+                                
+                            console.log(`🔄 MANUAL FIT CALCULATION: scale=${scale.toFixed(3)}, translate=(${translateX.toFixed(1)}, ${translateY.toFixed(1)})`);
+                        } else {
+                            // Enhanced fallback
+                            const containerRect = container.getBoundingClientRect();
+                            newTransform = d3.zoomIdentity
+                                .translate(containerRect.width/2, containerRect.height/2)
+                                .scale(0.7);
+                            console.log(`🔄 FALLBACK FIT applied`);
+                        }
+                        break;
+                    default:
+                        return;
+                }
+                
+                if (newTransform) {
+                    svg.transition()
+                        .duration(CONSTANTS.ANIMATION_DURATION)
+                        .call(zoom.transform, newTransform);
+                    
+                    // Update zoom display
+                    const zoomPercentage = Math.round(newTransform.k * 100);
+                    const zoomElement = document.getElementById('zoomLevel');
+                    if (zoomElement) {
+                        zoomElement.textContent = `${zoomPercentage}%`;
+                    }
+                    
+                    if (window.MarkdownMindmap?.UIComponents?.updateMetrics) {
+                        window.MarkdownMindmap.UIComponents.updateMetrics({
+                            zoomLevel: zoomPercentage
+                        });
+                    }
+                }
+            });
+            
+            console.log('%c[INIT] Zoom event listeners registered successfully', 'background:blue;color:white;padding:3px');
+        }
+        
         // Register theme listener
         registerThemeChangeListener();
-        document.addEventListener('DOMContentLoaded', registerThemeChangeListener);
+        registerZoomEventListeners();
+        document.addEventListener('DOMContentLoaded', () => {
+            registerThemeChangeListener();
+            registerZoomEventListeners();
+        });
     }
     
     // Export for module systems
